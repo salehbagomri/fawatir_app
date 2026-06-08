@@ -45,7 +45,7 @@ dependencies:
   share_plus: ^13.1.0
   google_fonts: ^8.1.0
   intl: ^0.20.2
-  file_picker: ^3.0.4
+  file_picker: ^11.0.2
   path_provider: ^2.1.5
 
 dev_dependencies:
@@ -102,3 +102,6 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+dependency_overrides:
+  win32: ^6.0.1
