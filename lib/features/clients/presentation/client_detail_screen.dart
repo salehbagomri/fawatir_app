@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:fawatir/app/theme.dart';
 import 'package:fawatir/core/money.dart';
 import 'package:fawatir/features/clients/application/client_providers.dart';
+import 'package:fawatir/features/invoices/application/invoice_providers.dart';
+import 'package:fawatir/data/db/tables.dart';
 
 class ClientDetailScreen extends ConsumerWidget {
   final int clientId;
@@ -131,7 +133,7 @@ class ClientDetailScreen extends ConsumerWidget {
                   Expanded(
                     child: TabBarView(
                       children: [
-                        _buildEmptyState('لا توجد فواتير بعد', Icons.receipt_long),
+                        ClientInvoicesTab(clientId: client.id),
                         _buildEmptyState('لا توجد تحصيلات بعد', Icons.payment),
                         _buildEmptyState('لا يوجد كشف حساب بعد', Icons.history),
                       ],
@@ -275,5 +277,156 @@ class ClientDetailScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+class ClientInvoicesTab extends ConsumerWidget {
+  final int clientId;
+  const ClientInvoicesTab({super.key, required this.clientId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final invoicesAsync = ref.watch(clientInvoicesProvider(clientId));
+
+    return invoicesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('خطأ في تحميل الفواتير: $err')),
+      data: (invoices) {
+        if (invoices.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.receipt_long,
+                  size: 48,
+                  color: AppColors.muted.withValues(alpha: 0.4),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'لا توجد فواتير بعد',
+                  style: TextStyle(color: AppColors.muted, fontSize: 16),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: invoices.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final invoice = invoices[index];
+            final statusColor = _getStatusColor(invoice.status);
+
+            return Card(
+              elevation: 1,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: AppColors.line.withValues(alpha: 0.5)),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  context.go('/invoices/${invoice.id}');
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            invoice.number,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: AppColors.accent,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${invoice.issueDate.year}/${invoice.issueDate.month.toString().padLeft(2, '0')}/${invoice.issueDate.day.toString().padLeft(2, '0')}',
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            formatMoney(invoice.totalMinor, invoice.currency),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              _getStatusLabel(invoice.status),
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Color _getStatusColor(InvoiceStatus status) {
+    switch (status) {
+      case InvoiceStatus.draft:
+        return Colors.grey;
+      case InvoiceStatus.sent:
+        return Colors.blue;
+      case InvoiceStatus.paid:
+        return Colors.green;
+      case InvoiceStatus.partiallyPaid:
+        return Colors.orange;
+      case InvoiceStatus.overdue:
+        return Colors.red;
+      case InvoiceStatus.cancelled:
+        return Colors.grey.shade600;
+    }
+  }
+
+  String _getStatusLabel(InvoiceStatus status) {
+    switch (status) {
+      case InvoiceStatus.draft:
+        return 'مسودة';
+      case InvoiceStatus.sent:
+        return 'مرسلة';
+      case InvoiceStatus.paid:
+        return 'مدفوعة';
+      case InvoiceStatus.partiallyPaid:
+        return 'مدفوعة جزئياً';
+      case InvoiceStatus.overdue:
+        return 'متأخرة';
+      case InvoiceStatus.cancelled:
+        return 'ملغاة';
+    }
   }
 }

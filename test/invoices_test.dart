@@ -109,8 +109,9 @@ void main() {
     await tester.tap(saveButton);
     await tester.pumpAndSettle();
 
-    // 10. Verify we popped back to invoices screen
-    expect(find.text('لا توجد فواتير بعد'), findsOneWidget);
+    // 10. Verify we popped back to invoices screen and the invoice card is visible
+    expect(find.text('INV-2026-0001'), findsOneWidget);
+    expect(find.text('شريك النجاح'), findsOneWidget);
 
     // 11. Verify invoice was inserted into the database with total 2600 minor
     final invoices = await db.select(db.invoices).get();
