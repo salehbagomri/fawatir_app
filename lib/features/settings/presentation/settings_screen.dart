@@ -33,11 +33,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _checkGoogleStatus() async {
+  Future<void> _checkGoogleStatus({bool showLocalLoading = true}) async {
     if (!mounted) return;
-    setState(() {
-      _isDriveLoading = true;
-    });
+    if (showLocalLoading) {
+      setState(() {
+        _isDriveLoading = true;
+      });
+    }
     try {
       final backupService = ref.read(backupServiceProvider);
       final signedIn = await backupService.isSignedIn();
@@ -54,7 +56,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     } catch (e) {
       // Handle network failure or other errors silently as requested
     } finally {
-      if (mounted) {
+      if (mounted && showLocalLoading) {
         setState(() {
           _isDriveLoading = false;
         });
@@ -162,7 +164,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final account = await backupService.signIn();
       if (!mounted) return;
       if (account != null) {
-        await _checkGoogleStatus();
+        await _checkGoogleStatus(showLocalLoading: false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -191,7 +193,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final backupService = ref.read(backupServiceProvider);
       await backupService.signOut();
       if (!mounted) return;
-      await _checkGoogleStatus();
+      await _checkGoogleStatus(showLocalLoading: false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -219,7 +221,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final backupService = ref.read(backupServiceProvider);
       await backupService.backupToDrive();
       if (!mounted) return;
-      await _checkGoogleStatus();
+      await _checkGoogleStatus(showLocalLoading: false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

@@ -17,6 +17,7 @@ const String googleDriveServerClientId =
 class BackupService {
   final AppDatabase _db;
   bool _isInitialized = false;
+  GoogleSignInAccount? _currentUser;
 
   BackupService(this._db);
 
@@ -72,9 +73,13 @@ class BackupService {
 
   Future<GoogleSignInAccount?> getCurrentUser() async {
     await _ensureInitialized();
+    if (_currentUser != null) {
+      return _currentUser;
+    }
     try {
       final future = GoogleSignIn.instance.attemptLightweightAuthentication();
       final account = future != null ? await future : null;
+      _currentUser = account;
       return account;
     } catch (e) {
       return null;
@@ -89,8 +94,10 @@ class BackupService {
       final authClient = account.authorizationClient;
       await authClient.authorizationForScopes(scopes) ??
           await authClient.authorizeScopes(scopes);
+      _currentUser = account;
       return account;
     } catch (e) {
+      _currentUser = null;
       throw Exception('فشل تسجيل الدخول: $e');
     }
   }
@@ -99,6 +106,7 @@ class BackupService {
     await _ensureInitialized();
     try {
       await GoogleSignIn.instance.signOut();
+      _currentUser = null;
     } catch (e) {
       throw Exception('فشل تسجيل الخروج: $e');
     }
@@ -113,6 +121,7 @@ class BackupService {
       ]);
       return auth != null;
     } catch (e) {
+      _currentUser = null;
       return false;
     }
   }
@@ -128,12 +137,17 @@ class BackupService {
     final scopes = [drive.DriveApi.driveAppdataScope];
     final authClient = account.authorizationClient;
 
-    final auth =
-        await authClient.authorizationForScopes(scopes) ??
-        await authClient.authorizeScopes(scopes);
+    try {
+      final auth =
+          await authClient.authorizationForScopes(scopes) ??
+          await authClient.authorizeScopes(scopes);
 
-    final client = auth.authClient(scopes: scopes);
-    return drive.DriveApi(client);
+      final client = auth.authClient(scopes: scopes);
+      return drive.DriveApi(client);
+    } catch (e) {
+      _currentUser = null;
+      rethrow;
+    }
   }
 
   Future<DateTime?> getLastBackupTime() async {
