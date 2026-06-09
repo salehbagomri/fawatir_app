@@ -275,27 +275,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     try {
       final backupService = ref.read(backupServiceProvider);
       final imported = await backupService.restoreFromDrive();
-      if (!mounted) return;
 
       if (imported) {
-        _setLoading(false);
-        await showDialog<void>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('تمت الاستعادة بنجاح'),
-            content: const Text('تمت الاستعادة بنجاح. الرجاء إغلاق التطبيق وإعادة فتحه.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  exit(0);
-                },
-                child: const Text('موافق (إغلاق التطبيق)'),
-              ),
-            ],
-          ),
-        );
+        // Database is now closed — do NOT attempt to show dialogs or update UI
+        // as all active streams are broken. Exit immediately and let the OS restart the app.
+        exit(0);
       }
     } catch (e) {
       if (!mounted) return;
