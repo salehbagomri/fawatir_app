@@ -8,6 +8,11 @@ import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:extension_google_sign_in_as_googleapis_auth/extension_google_sign_in_as_googleapis_auth.dart';
 import '../../../data/db/database.dart';
 
+/// معرّف عميل الويب (Web Client ID) الخاص بك من Google Cloud Console.
+/// مطلوب على نظام Android لتفعيل النسخ الاحتياطي السحابي عبر Google Drive.
+/// مثال: '1234567890-abcdefg.apps.googleusercontent.com'
+const String? googleDriveServerClientId = null;
+
 class BackupService {
   final AppDatabase _db;
   bool _isInitialized = false;
@@ -16,7 +21,9 @@ class BackupService {
 
   Future<void> _ensureInitialized() async {
     if (!_isInitialized) {
-      await GoogleSignIn.instance.initialize();
+      await GoogleSignIn.instance.initialize(
+        serverClientId: googleDriveServerClientId,
+      );
       _isInitialized = true;
     }
   }
