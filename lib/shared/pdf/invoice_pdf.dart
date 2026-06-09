@@ -161,10 +161,11 @@ pw.Widget _metaRow(String l, String v, pw.Font medium) => pw.Padding(
     );
 
 pw.Widget _parties(InvoicePdfData d, pw.Font bold, pw.Font medium) => pw.Container(
+      width: double.infinity,
       padding: const pw.EdgeInsets.all(14),
       decoration: pw.BoxDecoration(
           color: _zebra, borderRadius: pw.BorderRadius.circular(6)),
-      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
         pw.Text('فاتورة إلى',
             style: pw.TextStyle(font: medium, fontSize: 9, color: _muted)),
         pw.SizedBox(height: 4),
@@ -183,12 +184,14 @@ pw.Widget _parties(InvoicePdfData d, pw.Font bold, pw.Font medium) => pw.Contain
     );
 
 pw.Widget _itemsTable(InvoicePdfData d, pw.Font bold, pw.Font medium) {
+  // Column order: index 0 = leftmost → index 3 = rightmost (RTL visual)
+  // Visual RTL order (right→left): الوصف، الكمية، سعر الوحدة، الإجمالي
   final rows = <pw.TableRow>[
     pw.TableRow(decoration: pw.BoxDecoration(color: _accent), children: [
-      _headCell('الوصف', medium, pw.TextAlign.right),
+      _headCell('الإجمالي', medium, pw.TextAlign.center),
+      _headCell('سعر الوحدة', medium, pw.TextAlign.center),
       _headCell('الكمية', medium, pw.TextAlign.center),
-      _headCell('سعر الوحدة', medium, pw.TextAlign.left),
-      _headCell('الإجمالي', medium, pw.TextAlign.left),
+      _headCell('الوصف', medium, pw.TextAlign.right),
     ]),
     for (var i = 0; i < d.items.length; i++)
       pw.TableRow(
@@ -197,19 +200,19 @@ pw.Widget _itemsTable(InvoicePdfData d, pw.Font bold, pw.Font medium) {
           border: pw.Border(bottom: pw.BorderSide(color: _line, width: 0.5)),
         ),
         children: [
-          _bodyCell(d.items[i].description, pw.TextAlign.right),
-          _bodyCell(_qty(d.items[i].quantity), pw.TextAlign.center),
-          _bodyCell(_money(d.items[i].unitPriceMinor, d.currency), pw.TextAlign.left),
-          _bodyCell(_money(d.items[i].lineTotalMinor, d.currency), pw.TextAlign.left,
+          _bodyCell(_money(d.items[i].lineTotalMinor, d.currency), pw.TextAlign.center,
               bold: bold),
+          _bodyCell(_money(d.items[i].unitPriceMinor, d.currency), pw.TextAlign.center),
+          _bodyCell(_qty(d.items[i].quantity), pw.TextAlign.center),
+          _bodyCell(d.items[i].description, pw.TextAlign.right),
         ],
       ),
   ];
   return pw.Table(columnWidths: const {
-    0: pw.FlexColumnWidth(4.2),
-    1: pw.FlexColumnWidth(1.2),
-    2: pw.FlexColumnWidth(2),
-    3: pw.FlexColumnWidth(2),
+    0: pw.FlexColumnWidth(2),
+    1: pw.FlexColumnWidth(2),
+    2: pw.FlexColumnWidth(1.2),
+    3: pw.FlexColumnWidth(4.2),
   }, children: rows);
 }
 
