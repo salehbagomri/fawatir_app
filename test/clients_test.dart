@@ -73,6 +73,11 @@ void main() {
     // Verify details screen shows client info
     expect(find.byIcon(Icons.edit), findsOneWidget);
     expect(find.text('لا توجد مستحقات'), findsOneWidget); // Zero balance default
+    
+    // Expand details card to show phone number
+    await tester.tap(find.text('المزيد من التفاصيل'));
+    await tester.pumpAndSettle();
+
     expect(find.textContaining('777777777'), findsOneWidget);
 
     // Clean up by disposing the widget tree inside the test body first
@@ -128,6 +133,11 @@ void main() {
     // Verify Client Detail Screen is open
     expect(find.byIcon(Icons.edit), findsOneWidget);
     expect(find.text('لا توجد مستحقات'), findsOneWidget); // Zero balance
+
+    // Expand details card to show phone number
+    await tester.tap(find.text('المزيد من التفاصيل'));
+    await tester.pumpAndSettle();
+
     expect(find.textContaining('733333333'), findsOneWidget);
 
     // Tap edit button to open form

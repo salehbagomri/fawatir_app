@@ -13,15 +13,24 @@ import 'package:fawatir/shared/pdf/receipt_pdf.dart';
 import 'package:fawatir/features/payments/application/receipt_pdf_service.dart';
 import 'package:fawatir/features/statements/data/statement_repository.dart';
 import 'package:fawatir/features/statements/application/statement_providers.dart';
+import 'package:fawatir/shared/pdf/statement_pdf.dart';
+import 'package:fawatir/features/statements/application/statement_pdf_service.dart';
 
-class ClientDetailScreen extends ConsumerWidget {
+class ClientDetailScreen extends ConsumerStatefulWidget {
   final int clientId;
   const ClientDetailScreen({super.key, required this.clientId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final clientAsync = ref.watch(clientByIdProvider(clientId));
-    final balanceAsync = ref.watch(clientBalanceProvider(clientId));
+  ConsumerState<ClientDetailScreen> createState() => _ClientDetailScreenState();
+}
+
+class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final clientAsync = ref.watch(clientByIdProvider(widget.clientId));
+    final balanceAsync = ref.watch(clientBalanceProvider(widget.clientId));
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -59,12 +68,12 @@ class ClientDetailScreen extends ConsumerWidget {
                 children: [
                   // Upper Card with Client Details
                   Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                     child: Card(
                       elevation: 2,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       child: Padding(
-                        padding: const EdgeInsets.all(16.0),
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -76,7 +85,7 @@ class ClientDetailScreen extends ConsumerWidget {
                                   child: Text(
                                     client.name,
                                     style: const TextStyle(
-                                      fontSize: 20,
+                                      fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -84,14 +93,14 @@ class ClientDetailScreen extends ConsumerWidget {
                                 _buildStatusBadge(client.isActive),
                               ],
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
 
                             // Balance info
                             balanceAsync.when(
                               loading: () => const Center(
                                 child: SizedBox(
-                                  width: 24,
-                                  height: 24,
+                                  width: 20,
+                                  height: 20,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 ),
                               ),
@@ -102,22 +111,45 @@ class ClientDetailScreen extends ConsumerWidget {
                               data: (balanceMinor) => _buildBalanceCard(balanceMinor, client.accountCurrency),
                             ),
 
-                            const Divider(height: 32),
+                            // Collapsible Additional Details
+                            if (_expanded) ...[
+                              const Divider(height: 16, thickness: 0.5),
+                              if (client.contactPerson != null && client.contactPerson!.isNotEmpty)
+                                _buildDetailRow(Icons.contact_phone, 'المسؤول', client.contactPerson!),
+                              if (client.phone != null && client.phone!.isNotEmpty)
+                                _buildDetailRow(Icons.phone, 'الهاتف', client.phone!),
+                              if (client.address != null && client.address!.isNotEmpty)
+                                _buildDetailRow(Icons.location_on, 'العنوان', client.address!),
+                              _buildDetailRow(
+                                Icons.monetization_on,
+                                'العملة',
+                                '${client.accountCurrency} (${symbolFor(client.accountCurrency)})',
+                              ),
+                              if (client.notes != null && client.notes!.isNotEmpty)
+                                _buildDetailRow(Icons.note, 'ملاحظات', client.notes!),
+                            ],
 
-                            // Additional Info Rows
-                            if (client.contactPerson != null && client.contactPerson!.isNotEmpty)
-                              _buildDetailRow(Icons.contact_phone, 'الشخص المسؤول', client.contactPerson!),
-                            if (client.phone != null && client.phone!.isNotEmpty)
-                              _buildDetailRow(Icons.phone, 'رقم الهاتف', client.phone!),
-                            if (client.address != null && client.address!.isNotEmpty)
-                              _buildDetailRow(Icons.location_on, 'العنوان', client.address!),
-                            _buildDetailRow(
-                              Icons.monetization_on,
-                              'عملة الحساب',
-                              '${client.accountCurrency} (${symbolFor(client.accountCurrency)})',
+                            const SizedBox(height: 4),
+                            Align(
+                              alignment: Alignment.center,
+                              child: TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  minimumSize: Size.zero,
+                                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                icon: Icon(_expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, size: 18, color: AppColors.accent),
+                                label: Text(
+                                  _expanded ? 'تفاصيل أقل' : 'المزيد من التفاصيل',
+                                  style: const TextStyle(fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.bold),
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _expanded = !_expanded;
+                                  });
+                                },
+                              ),
                             ),
-                            if (client.notes != null && client.notes!.isNotEmpty)
-                              _buildDetailRow(Icons.note, 'ملاحظات', client.notes!),
                           ],
                         ),
                       ),
@@ -201,7 +233,7 @@ class ClientDetailScreen extends ConsumerWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(8),
@@ -215,12 +247,12 @@ class ClientDetailScreen extends ConsumerWidget {
             children: [
               const Text(
                 'الرصيد الحالي',
-                style: TextStyle(color: AppColors.muted, fontSize: 13),
+                style: TextStyle(color: AppColors.muted, fontSize: 12),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 15),
+                style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13),
               ),
             ],
           ),
@@ -228,7 +260,7 @@ class ClientDetailScreen extends ConsumerWidget {
             formatted,
             style: TextStyle(
               color: textColor,
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -239,23 +271,27 @@ class ClientDetailScreen extends ConsumerWidget {
 
   Widget _buildDetailRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: AppColors.muted),
-          const SizedBox(width: 12),
+          Icon(icon, size: 16, color: AppColors.muted),
+          const SizedBox(width: 8),
           Text(
             '$label: ',
             style: const TextStyle(
               color: AppColors.muted,
+              fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
             ),
           ),
         ],
@@ -661,6 +697,52 @@ class _ClientStatementTabState extends State<ClientStatementTab> {
     });
   }
 
+  Future<void> _shareStatement(BuildContext context, WidgetRef ref) async {
+    final nav = Navigator.of(context, rootNavigator: true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final data = await ref.read(statementPdfServiceProvider)(widget.clientId, from: _fromDate, to: _toDate);
+      final bytes = await buildStatementPdf(data);
+      nav.pop();
+      await shareStatementPdf(bytes, data.clientName);
+    } catch (e) {
+      nav.pop();
+      messenger.showSnackBar(
+        SnackBar(content: Text('خطأ أثناء مشاركة كشف الحساب: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _previewStatement(BuildContext context, WidgetRef ref) async {
+    final nav = Navigator.of(context, rootNavigator: true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final data = await ref.read(statementPdfServiceProvider)(widget.clientId, from: _fromDate, to: _toDate);
+      final bytes = await buildStatementPdf(data);
+      nav.pop();
+      await previewStatementPdf(bytes);
+    } catch (e) {
+      nav.pop();
+      messenger.showSnackBar(
+        SnackBar(content: Text('خطأ أثناء معاينة كشف الحساب: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -763,6 +845,40 @@ class _ClientStatementTabState extends State<ClientStatementTab> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // PDF sharing and preview buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.accent,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                icon: const Icon(Icons.share, size: 18),
+                                label: const Text('مشاركة الكشف', style: TextStyle(fontWeight: FontWeight.bold)),
+                                onPressed: () => _shareStatement(context, ref),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.accent,
+                                  side: const BorderSide(color: AppColors.accent),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                icon: const Icon(Icons.picture_as_pdf, size: 18),
+                                label: const Text('معاينة PDF', style: TextStyle(fontWeight: FontWeight.bold)),
+                                onPressed: () => _previewStatement(context, ref),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        
                         // Opening Balance Card
                         Card(
                           color: Colors.grey.shade50,

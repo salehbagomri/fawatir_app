@@ -126,7 +126,7 @@ class AppShell extends StatelessWidget {
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.dashboard),
-            label: 'لوحة المعلومات',
+            label: 'الرئيسية',
           ),
           NavigationDestination(
             icon: Icon(Icons.people),
