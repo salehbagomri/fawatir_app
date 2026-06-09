@@ -5,11 +5,7 @@ import 'package:fawatir/app/theme.dart';
 import 'package:fawatir/app/router.dart';
 
 void main() {
-  runApp(
-    const ProviderScope(
-      child: MyApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -21,9 +17,7 @@ class MyApp extends StatelessWidget {
       title: 'الفواتير',
       theme: getAppTheme(),
       locale: const Locale('ar'),
-      supportedLocales: const [
-        Locale('ar'),
-      ],
+      supportedLocales: const [Locale('ar')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,

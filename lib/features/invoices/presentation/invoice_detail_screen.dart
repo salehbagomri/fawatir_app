@@ -1,11 +1,16 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fawatir/app/theme.dart';
 import 'package:fawatir/core/money.dart';
 import 'package:fawatir/data/db/tables.dart';
+import 'package:fawatir/data/db/database.dart';
 import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/invoices/application/invoice_providers.dart';
+import 'package:fawatir/features/company/application/company_providers.dart';
 import 'package:fawatir/features/payments/data/payment_repository.dart';
+import 'package:fawatir/shared/pdf/invoice_pdf.dart';
 
 class InvoiceDetailScreen extends ConsumerWidget {
   final int invoiceId;
@@ -53,12 +58,32 @@ class InvoiceDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final invoiceAsync = ref.watch(invoiceByIdProvider(invoiceId));
     final itemsAsync = ref.watch(invoiceItemsProvider(invoiceId));
+    final companyAsync = ref.watch(companyStreamProvider);
+
+    final invoice = invoiceAsync.value;
+    final client = invoice != null ? ref.watch(clientByIdProvider(invoice.clientId)).value : null;
+    final company = companyAsync.value;
+    final items = itemsAsync.value ?? [];
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('تفاصيل الفاتورة'),
+          actions: [
+            if (invoice != null && client != null && company != null) ...[
+              IconButton(
+                icon: const Icon(Icons.share),
+                tooltip: 'مشاركة PDF',
+                onPressed: () => _shareInvoice(context, ref, company, client, invoice, items),
+              ),
+              IconButton(
+                icon: const Icon(Icons.print),
+                tooltip: 'معاينة PDF',
+                onPressed: () => _previewInvoice(context, ref, company, client, invoice, items),
+              ),
+            ]
+          ],
         ),
         body: invoiceAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -348,6 +373,50 @@ class InvoiceDetailScreen extends ConsumerWidget {
                           ),
                         ),
                       ],
+                      const SizedBox(height: 24),
+                      // Actions Section
+                      if (client != null && company != null) ...[
+                        const Text(
+                          'الإجراءات',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.accent),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.accent,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.share),
+                                label: const Text('مشاركة الفاتورة', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                onPressed: () => _shareInvoice(context, ref, company, client, invoice, items),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.accent,
+                                  side: const BorderSide(color: AppColors.accent),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.print),
+                                label: const Text('معاينة وطباعة', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                onPressed: () => _previewInvoice(context, ref, company, client, invoice, items),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 );
@@ -385,5 +454,120 @@ class InvoiceDetailScreen extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Future<Uint8List?> _loadLogoBytes(String? path) async {
+    if (path == null || path.isEmpty) return null;
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        return await file.readAsBytes();
+      }
+    } catch (e) {
+      debugPrint('Error loading logo bytes: $e');
+    }
+    return null;
+  }
+
+  Future<void> _shareInvoice(BuildContext context, WidgetRef ref, Company company, Client client, Invoice invoice, List<InvoiceItem> items) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final logoBytes = await _loadLogoBytes(company.logoPath);
+      final pdfData = InvoicePdfData(
+        company: CompanyInfo(
+          name: company.name,
+          logoBytes: logoBytes,
+          address: company.address,
+          phone: company.phone,
+          email: company.email,
+          bankDetails: company.bankDetails,
+        ),
+        client: ClientInfo(
+          name: client.name,
+          contactPerson: client.contactPerson,
+          phone: client.phone,
+          address: client.address,
+        ),
+        number: invoice.number,
+        issueDate: invoice.issueDate,
+        dueDate: invoice.dueDate,
+        currency: invoice.currency,
+        items: items.map((e) => InvoiceLine(
+          description: e.description,
+          quantity: e.quantity,
+          unitPriceMinor: e.unitPriceMinor,
+        )).toList(),
+        notes: invoice.notes,
+      );
+
+      final pdfBytes = await buildInvoicePdf(pdfData);
+      if (context.mounted) {
+        Navigator.pop(context); // Dismiss loading dialog
+        await shareInvoicePdf(pdfBytes, invoice.number);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // Dismiss loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ أثناء مشاركة الفاتورة: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _previewInvoice(BuildContext context, WidgetRef ref, Company company, Client client, Invoice invoice, List<InvoiceItem> items) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final logoBytes = await _loadLogoBytes(company.logoPath);
+      final pdfData = InvoicePdfData(
+        company: CompanyInfo(
+          name: company.name,
+          logoBytes: logoBytes,
+          address: company.address,
+          phone: company.phone,
+          email: company.email,
+          bankDetails: company.bankDetails,
+        ),
+        client: ClientInfo(
+          name: client.name,
+          contactPerson: client.contactPerson,
+          phone: client.phone,
+          address: client.address,
+        ),
+        number: invoice.number,
+        issueDate: invoice.issueDate,
+        dueDate: invoice.dueDate,
+        currency: invoice.currency,
+        items: items.map((e) => InvoiceLine(
+          description: e.description,
+          quantity: e.quantity,
+          unitPriceMinor: e.unitPriceMinor,
+        )).toList(),
+        notes: invoice.notes,
+      );
+
+      final pdfBytes = await buildInvoicePdf(pdfData);
+      if (context.mounted) {
+        Navigator.pop(context); // Dismiss loading dialog
+        await previewInvoicePdf(pdfBytes);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context); // Dismiss loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ أثناء معاينة الفاتورة: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 }

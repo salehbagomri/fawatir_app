@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -81,11 +82,16 @@ String _money(int minor, String c) {
 String _date(DateTime d) =>
     '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
 
-Future<(pw.Font, pw.Font, pw.Font)> _loadFonts() async => (
-      await PdfGoogleFonts.iBMPlexSansArabicRegular(),
-      await PdfGoogleFonts.iBMPlexSansArabicMedium(),
-      await PdfGoogleFonts.iBMPlexSansArabicBold(),
-    );
+Future<(pw.Font, pw.Font, pw.Font)> _loadFonts() async {
+  final regData = await rootBundle.load('assets/fonts/IBMPlexSansArabic-Regular.ttf');
+  final medData = await rootBundle.load('assets/fonts/IBMPlexSansArabic-Medium.ttf');
+  final boldData = await rootBundle.load('assets/fonts/IBMPlexSansArabic-Bold.ttf');
+  return (
+    pw.Font.ttf(regData),
+    pw.Font.ttf(medData),
+    pw.Font.ttf(boldData),
+  );
+}
 
 Future<Uint8List> buildInvoicePdf(InvoicePdfData data) async {
   final (regular, medium, bold) = await _loadFonts();
