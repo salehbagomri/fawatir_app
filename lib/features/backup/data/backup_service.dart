@@ -233,9 +233,23 @@ class BackupService {
               .timeout(const Duration(seconds: 30))
               as drive.Media;
 
-      // Close the DB first
+      // 1. Download to a temporary file first while DB is still open and active
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/temp_restore_db.sqlite');
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+
+      final iosSink = tempFile.openWrite();
+      await iosSink
+          .addStream(media.stream)
+          .timeout(const Duration(seconds: 60));
+      await iosSink.close();
+
+      // 2. Now that download completed successfully, close DB executor
       await _db.close();
 
+      // 3. Delete old DB files (including WAL/SHM) and copy the new one
       final localFile = await _db.databaseFile();
       final walFile = File('${localFile.path}-wal');
       final shmFile = File('${localFile.path}-shm');
@@ -250,11 +264,14 @@ class BackupService {
         await shmFile.delete();
       }
 
-      final iosSink = localFile.openWrite();
-      await iosSink
-          .addStream(media.stream)
-          .timeout(const Duration(seconds: 60));
-      await iosSink.close();
+      // Copy local temp file to destination database path
+      await tempFile.copy(localFile.path);
+
+      // Clean up the temporary file
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+
       return true;
     } catch (e) {
       throw Exception('فشل استعادة البيانات من Google Drive: $e');
