@@ -108,6 +108,9 @@ class PaymentRepository {
     if (invoiceId != null) q.where((p) => p.invoiceId.equals(invoiceId));
     return q.watch();
   }
+
+  Future<Payment?> getPayment(int id) =>
+      (db.select(db.payments)..where((p) => p.id.equals(id))).getSingleOrNull();
 }
 
 final paymentRepositoryProvider = Provider<PaymentRepository>(

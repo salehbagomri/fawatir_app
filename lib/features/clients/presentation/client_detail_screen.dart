@@ -9,6 +9,8 @@ import 'package:fawatir/data/db/database.dart';
 import 'package:fawatir/data/db/tables.dart';
 import 'package:fawatir/features/payments/data/payment_repository.dart';
 import 'package:fawatir/features/invoices/data/invoice_repository.dart';
+import 'package:fawatir/shared/pdf/receipt_pdf.dart';
+import 'package:fawatir/features/payments/application/receipt_pdf_service.dart';
 
 class ClientDetailScreen extends ConsumerWidget {
   final int clientId;
@@ -482,69 +484,84 @@ class ClientPaymentsTab extends ConsumerWidget {
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          formatMoney(payment.amountMinor, payment.currency),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: Colors.green,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                formatMoney(payment.amountMinor, payment.currency),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.green,
+                                ),
+                              ),
+                              Text(
+                                dateStr,
+                                style: const TextStyle(
+                                  color: AppColors.muted,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        Text(
-                          dateStr,
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 12,
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.payment, size: 16, color: AppColors.muted),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    payment.method ?? 'طريقة دفع غير محددة',
+                                    style: const TextStyle(fontSize: 13, color: AppColors.dark),
+                                  ),
+                                ],
+                              ),
+                              if (payment.invoiceId != null)
+                                FutureBuilder<Invoice?>(
+                                  future: ref.read(invoiceRepositoryProvider).getInvoice(payment.invoiceId!),
+                                  builder: (context, snapshot) {
+                                    if (snapshot.hasData && snapshot.data != null) {
+                                      return Text(
+                                        'فاتورة: ${snapshot.data!.number}',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: AppColors.accent,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      );
+                                    }
+                                    return const SizedBox.shrink();
+                                  },
+                                ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.payment, size: 16, color: AppColors.muted),
-                            const SizedBox(width: 6),
+                          if (payment.notes != null && payment.notes!.isNotEmpty) ...[
+                            const Divider(height: 16),
                             Text(
-                              payment.method ?? 'طريقة دفع غير محددة',
-                              style: const TextStyle(fontSize: 13, color: AppColors.dark),
+                              payment.notes!,
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
                             ),
                           ],
-                        ),
-                        if (payment.invoiceId != null)
-                          FutureBuilder<Invoice?>(
-                            future: ref.read(invoiceRepositoryProvider).getInvoice(payment.invoiceId!),
-                            builder: (context, snapshot) {
-                              if (snapshot.hasData && snapshot.data != null) {
-                                return Text(
-                                  'فاتورة: ${snapshot.data!.number}',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: AppColors.accent,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                );
-                              }
-                              return const SizedBox.shrink();
-                            },
-                          ),
-                      ],
-                    ),
-                    if (payment.notes != null && payment.notes!.isNotEmpty) ...[
-                      const Divider(height: 16),
-                      Text(
-                        payment.notes!,
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                        ],
                       ),
-                    ],
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onLongPress: () => _previewReceipt(context, ref, payment),
+                      child: IconButton(
+                        icon: const Icon(Icons.receipt_long, color: AppColors.accent),
+                        tooltip: 'سند قبض (مشاركة، نقرة مطولة للمعاينة)',
+                        onPressed: () => _shareReceipt(context, ref, payment),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -553,5 +570,51 @@ class ClientPaymentsTab extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<void> _shareReceipt(BuildContext context, WidgetRef ref, Payment payment) async {
+    final nav = Navigator.of(context, rootNavigator: true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final data = await ref.read(receiptPdfServiceProvider)(payment.id);
+      final bytes = await buildReceiptPdf(data);
+      nav.pop();
+      await shareReceiptPdf(bytes, data.receiptNumber);
+    } catch (e) {
+      nav.pop();
+      messenger.showSnackBar(
+        SnackBar(content: Text('خطأ أثناء مشاركة السند: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _previewReceipt(BuildContext context, WidgetRef ref, Payment payment) async {
+    final nav = Navigator.of(context, rootNavigator: true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final data = await ref.read(receiptPdfServiceProvider)(payment.id);
+      final bytes = await buildReceiptPdf(data);
+      nav.pop();
+      await previewReceiptPdf(bytes);
+    } catch (e) {
+      nav.pop();
+      messenger.showSnackBar(
+        SnackBar(content: Text('خطأ أثناء معاينة السند: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 }
