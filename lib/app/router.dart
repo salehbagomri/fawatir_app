@@ -5,6 +5,7 @@ import 'package:fawatir/features/clients/presentation/clients_screen.dart';
 import 'package:fawatir/features/invoices/presentation/invoices_screen.dart';
 import 'package:fawatir/features/settings/presentation/settings_screen.dart';
 import 'package:fawatir/features/company/presentation/company_form_screen.dart';
+import 'package:fawatir/features/clients/presentation/client_form_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
@@ -31,6 +32,20 @@ final goRouter = GoRouter(
             GoRoute(
               path: '/clients',
               builder: (context, state) => const ClientsScreen(),
+              routes: [
+                GoRoute(
+                  path: 'add',
+                  builder: (context, state) => const ClientFormScreen(),
+                ),
+                GoRoute(
+                  path: 'edit/:id',
+                  builder: (context, state) {
+                    final idStr = state.pathParameters['id'];
+                    final id = int.tryParse(idStr ?? '');
+                    return ClientFormScreen(clientId: id);
+                  },
+                ),
+              ],
             ),
           ],
         ),
