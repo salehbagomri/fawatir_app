@@ -97,7 +97,7 @@ Future<Uint8List> buildStatementPdf(StatementPdfData d) async {
       pw.SizedBox(height: 10),
       _table(d, bold, medium),
       pw.SizedBox(height: 14),
-      _totals(d, medium),
+      _totals(d, medium, bold),
       pw.SizedBox(height: 10),
       _closing(d, bold),
       pw.SizedBox(height: 32),
@@ -195,19 +195,33 @@ pw.Widget _h(String t, pw.Font medium, {pw.TextAlign align = pw.TextAlign.right}
           textAlign: align),
     );
 
-pw.Widget _c(String t, {pw.TextAlign align = pw.TextAlign.right}) => pw.Padding(
+pw.Widget _c(String t, {pw.TextAlign align = pw.TextAlign.right, pw.Font? font}) => pw.Padding(
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-      child: pw.Text(t, style: pw.TextStyle(fontSize: 8.5, color: _dark), textAlign: align),
+      child: pw.Text(t, style: pw.TextStyle(fontSize: 8.5, color: _dark, font: font), textAlign: align),
     );
 
-pw.Widget _totals(StatementPdfData d, pw.Font medium) => pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.end,
-      children: [
-        pw.Text('إجمالي المدين: ${_money(d.totalDebitMinor, d.currency)}    '
-            'إجمالي الدائن: ${_money(d.totalCreditMinor, d.currency)}',
-            style: pw.TextStyle(font: medium, fontSize: 9, color: _muted)),
-      ],
-    );
+pw.Widget _totals(StatementPdfData d, pw.Font medium, pw.Font bold) {
+  return pw.Table(
+    columnWidths: const {
+      0: pw.FlexColumnWidth(1.4),
+      1: pw.FlexColumnWidth(1.3),
+      2: pw.FlexColumnWidth(1.3),
+      3: pw.FlexColumnWidth(4.2),
+      4: pw.FlexColumnWidth(1.5),
+    },
+    children: [
+      pw.TableRow(
+        children: [
+          pw.SizedBox(),
+          _c(_money(d.totalCreditMinor, d.currency), align: pw.TextAlign.right, font: bold),
+          _c(_money(d.totalDebitMinor, d.currency), align: pw.TextAlign.right, font: bold),
+          _c('إجمالي الفترة:', align: pw.TextAlign.left, font: bold),
+          pw.SizedBox(),
+        ],
+      ),
+    ],
+  );
+}
 
 pw.Widget _closing(StatementPdfData d, pw.Font bold) => pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.end,
