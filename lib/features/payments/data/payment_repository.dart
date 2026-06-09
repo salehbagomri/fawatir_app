@@ -114,6 +114,10 @@ final paymentRepositoryProvider = Provider<PaymentRepository>(
   (ref) => PaymentRepository(ref.watch(databaseProvider)),
 );
 
+final clientPaymentsProvider =
+    StreamProvider.autoDispose.family<List<Payment>, int>((ref, clientId) =>
+        ref.watch(paymentRepositoryProvider).watchPayments(clientId: clientId));
+
 /// هل الفاتورة متأخرة؟ (يُحسب عند العرض، لا يُخزّن)
 bool isInvoiceOverdue(Invoice i) =>
     i.dueDate != null &&

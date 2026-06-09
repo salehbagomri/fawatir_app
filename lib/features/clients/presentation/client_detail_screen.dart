@@ -5,7 +5,10 @@ import 'package:fawatir/app/theme.dart';
 import 'package:fawatir/core/money.dart';
 import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/invoices/application/invoice_providers.dart';
+import 'package:fawatir/data/db/database.dart';
 import 'package:fawatir/data/db/tables.dart';
+import 'package:fawatir/features/payments/data/payment_repository.dart';
+import 'package:fawatir/features/invoices/data/invoice_repository.dart';
 
 class ClientDetailScreen extends ConsumerWidget {
   final int clientId;
@@ -134,7 +137,7 @@ class ClientDetailScreen extends ConsumerWidget {
                     child: TabBarView(
                       children: [
                         ClientInvoicesTab(clientId: client.id),
-                        _buildEmptyState('لا توجد تحصيلات بعد', Icons.payment),
+                        ClientPaymentsTab(clientId: client.id),
                         _buildEmptyState('لا يوجد كشف حساب بعد', Icons.history),
                       ],
                     ),
@@ -428,5 +431,127 @@ class ClientInvoicesTab extends ConsumerWidget {
       case InvoiceStatus.cancelled:
         return 'ملغاة';
     }
+  }
+}
+
+class ClientPaymentsTab extends ConsumerWidget {
+  final int clientId;
+  const ClientPaymentsTab({super.key, required this.clientId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final paymentsAsync = ref.watch(clientPaymentsProvider(clientId));
+
+    return paymentsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, stack) => Center(child: Text('خطأ في تحميل التحصيلات: $err')),
+      data: (payments) {
+        if (payments.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.payment,
+                  size: 48,
+                  color: AppColors.muted.withValues(alpha: 0.4),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'لا توجد تحصيلات بعد',
+                  style: TextStyle(color: AppColors.muted, fontSize: 16),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: payments.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final payment = payments[index];
+            final dateStr = '${payment.paymentDate.year}/${payment.paymentDate.month.toString().padLeft(2, '0')}/${payment.paymentDate.day.toString().padLeft(2, '0')}';
+
+            return Card(
+              elevation: 1,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: AppColors.line.withValues(alpha: 0.5)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          formatMoney(payment.amountMinor, payment.currency),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.green,
+                          ),
+                        ),
+                        Text(
+                          dateStr,
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.payment, size: 16, color: AppColors.muted),
+                            const SizedBox(width: 6),
+                            Text(
+                              payment.method ?? 'طريقة دفع غير محددة',
+                              style: const TextStyle(fontSize: 13, color: AppColors.dark),
+                            ),
+                          ],
+                        ),
+                        if (payment.invoiceId != null)
+                          FutureBuilder<Invoice?>(
+                            future: ref.read(invoiceRepositoryProvider).getInvoice(payment.invoiceId!),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasData && snapshot.data != null) {
+                                return Text(
+                                  'فاتورة: ${snapshot.data!.number}',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.accent,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
+                      ],
+                    ),
+                    if (payment.notes != null && payment.notes!.isNotEmpty) ...[
+                      const Divider(height: 16),
+                      Text(
+                        payment.notes!,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }
