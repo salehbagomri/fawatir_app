@@ -14,7 +14,15 @@
       },
       "oauth_client": [
         {
-          "client_id": "678878516062-009cn4p8uubtk71l1kh9pmvbpiblva03.apps.googleusercontent.com",
+          "client_id": "678878516062-g82crtpds26bhcqrd2gejd61di0lsrdd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.bagomri.fawatir",
+            "certificate_hash": "22d8ee8968c79334584a7090b6312aed6d3e7bce"
+          }
+        },
+        {
+          "client_id": "678878516062-mgng9f7acotlnk4hlvid42ol4p2iiklc.apps.googleusercontent.com",
           "client_type": 3
         }
       ],

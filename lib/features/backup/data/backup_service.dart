@@ -12,7 +12,7 @@ import '../../../data/db/database.dart';
 /// مطلوب على نظام Android لتفعيل النسخ الاحتياطي السحابي عبر Google Drive.
 /// مثال: '1234567890-abcdefg.apps.googleusercontent.com'
 const String googleDriveServerClientId =
-    '678878516062-009cn4p8uubtk71l1kh9pmvbpiblva03.apps.googleusercontent.com';
+    '678878516062-mgng9f7acotlnk4hlvid42ol4p2iiklc.apps.googleusercontent.com';
 
 class BackupService {
   final AppDatabase _db;
