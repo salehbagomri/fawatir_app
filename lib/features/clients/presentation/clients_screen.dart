@@ -136,8 +136,8 @@ class ClientsScreen extends ConsumerWidget {
                           ],
                         ),
                         onTap: () {
-                          // Open edit client screen
-                          context.go('/clients/edit/${client.id}');
+                          // Open client detail screen
+                          context.go('/clients/${client.id}');
                         },
                       );
                     },

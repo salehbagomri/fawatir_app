@@ -36,18 +36,18 @@ void main() {
     await tester.pumpWidget(createTestWidget());
     await tester.pump(const Duration(milliseconds: 500));
 
-    // Navigate to Clients tab using icon to avoid ambiguity with AppBar title
+    // Navigate to Clients tab using icon (loading indicator is shown, use timed pump)
     await tester.tap(find.byIcon(Icons.people));
     await pumpAndIdle(tester);
 
     // Verify empty state message is shown
     expect(find.text('لا يوجد عملاء بعد'), findsOneWidget);
 
-    // Tap on FAB to add client
+    // Tap on FAB to add client (no loaders on form, pumpAndSettle is safe)
     final fab = find.byType(FloatingActionButton);
     expect(fab, findsOneWidget);
     await tester.tap(fab);
-    await pumpAndIdle(tester);
+    await tester.pumpAndSettle();
 
     // Verify Add Client Screen is open
     expect(find.text('إضافة عميل جديد'), findsOneWidget);
@@ -57,22 +57,23 @@ void main() {
     await tester.enterText(find.widgetWithText(TextFormField, 'رقم الهاتف'), '777777777');
     await tester.pump();
 
-    // Tap save button (the check icon in actions)
+    // Tap save button (pops back, use pumpAndSettle to let transition finish completely)
     final saveButton = find.byIcon(Icons.check);
     expect(saveButton, findsOneWidget);
     await tester.tap(saveButton);
-    await pumpAndIdle(tester);
+    await tester.pumpAndSettle();
 
-    // Verify we popped back to clients list and see the new client in a ListTile specifically
-    // to avoid matching the popped form's animating EditableText
+    // Verify we popped back to clients list and see the new client
     expect(find.widgetWithText(ListTile, 'أحمد محمد'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(ListTile),
-        matching: find.textContaining('777777777'),
-      ),
-      findsOneWidget,
-    );
+    
+    // Tap on client to view details
+    await tester.tap(find.widgetWithText(ListTile, 'أحمد محمد'));
+    await tester.pumpAndSettle();
+
+    // Verify details screen shows client info
+    expect(find.byIcon(Icons.edit), findsOneWidget);
+    expect(find.text('لا توجد مستحقات'), findsOneWidget); // Zero balance default
+    expect(find.textContaining('777777777'), findsOneWidget);
 
     // Clean up by disposing the widget tree inside the test body first
     await tester.pumpWidget(const SizedBox());
@@ -120,9 +121,18 @@ void main() {
     expect(find.widgetWithText(ListTile, 'خالد وليد'), findsOneWidget);
     expect(find.widgetWithText(ListTile, 'علي صالح'), findsNothing);
 
-    // Tap on the filtered client to edit
+    // Tap on the filtered client to view details
     await tester.tap(find.text('خالد وليد'));
-    await pumpAndIdle(tester);
+    await tester.pumpAndSettle();
+
+    // Verify Client Detail Screen is open
+    expect(find.byIcon(Icons.edit), findsOneWidget);
+    expect(find.text('لا توجد مستحقات'), findsOneWidget); // Zero balance
+    expect(find.textContaining('733333333'), findsOneWidget);
+
+    // Tap edit button to open form
+    await tester.tap(find.byIcon(Icons.edit));
+    await tester.pumpAndSettle();
 
     // Verify Edit Client Screen is open and initial values are pre-filled
     expect(find.text('تعديل بيانات العميل'), findsOneWidget);
@@ -132,9 +142,9 @@ void main() {
     await tester.enterText(find.widgetWithText(TextFormField, 'رقم الهاتف'), '733333334');
     await tester.pump();
 
-    // Tap save
+    // Tap save (pops back to details screen, which redirects or pops to clients)
     await tester.tap(find.byIcon(Icons.check));
-    await pumpAndIdle(tester);
+    await tester.pumpAndSettle();
 
     // Verify we are back to clients screen and update is visible
     // We clear search to see both
