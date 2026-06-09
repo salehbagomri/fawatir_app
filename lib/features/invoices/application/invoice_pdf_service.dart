@@ -6,7 +6,7 @@ import 'package:fawatir/features/invoices/data/invoice_repository.dart';
 import 'package:fawatir/features/clients/data/client_repository.dart';
 import 'package:fawatir/features/company/data/company_repository.dart';
 
-final invoicePdfServiceProvider = Provider.autoDispose<Future<InvoicePdfData> Function(int)>((ref) {
+final invoicePdfServiceProvider = Provider<Future<InvoicePdfData> Function(int)>((ref) {
   return (invoiceId) => buildInvoicePdfData(ref, invoiceId);
 });
 

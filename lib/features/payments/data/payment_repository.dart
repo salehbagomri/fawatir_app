@@ -100,6 +100,14 @@ class PaymentRepository {
     final remaining = invoice.totalMinor - paidInInvoiceCurrency;
     return remaining.round();
   }
+
+  Stream<List<Payment>> watchPayments({int? clientId, int? invoiceId}) {
+    final q = db.select(db.payments)
+      ..orderBy([(p) => OrderingTerm.desc(p.paymentDate)]);
+    if (clientId != null) q.where((p) => p.clientId.equals(clientId));
+    if (invoiceId != null) q.where((p) => p.invoiceId.equals(invoiceId));
+    return q.watch();
+  }
 }
 
 final paymentRepositoryProvider = Provider<PaymentRepository>(
