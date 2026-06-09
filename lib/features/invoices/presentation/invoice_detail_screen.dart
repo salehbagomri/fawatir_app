@@ -499,7 +499,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
   }
 
   Future<void> _shareInvoice(BuildContext context, WidgetRef ref, Company company, Client client, Invoice invoice, List<InvoiceItem> items) async {
-    final nav = Navigator.of(context);
+    final nav = Navigator.of(context, rootNavigator: true);
     final messenger = ScaffoldMessenger.of(context);
 
     showDialog(
@@ -523,7 +523,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
   }
 
   Future<void> _previewInvoice(BuildContext context, WidgetRef ref, Company company, Client client, Invoice invoice, List<InvoiceItem> items) async {
-    final nav = Navigator.of(context);
+    final nav = Navigator.of(context, rootNavigator: true);
     final messenger = ScaffoldMessenger.of(context);
 
     showDialog(
