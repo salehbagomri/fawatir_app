@@ -196,10 +196,7 @@ pw.Widget _details(ReceiptPdfData d, pw.Font medium) {
   }
 
   if (d.invoiceNumber != null) {
-    final inv = (d.invoiceTotalMinor != null && d.invoiceCurrency != null)
-        ? '${d.invoiceNumber}  (${_money(d.invoiceTotalMinor!, d.invoiceCurrency!)})'
-        : d.invoiceNumber!;
-    add('سداداً عن فاتورة رقم', inv);
+    add('سداد عن فاتورة رقم', d.invoiceNumber!);
   }
   if (d.method != null) add('طريقة الدفع', d.method!);
   if (d.fxNote != null) add('معادلة العملة', d.fxNote!);
