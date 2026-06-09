@@ -469,105 +469,80 @@ class InvoiceDetailScreen extends ConsumerWidget {
     return null;
   }
 
+  InvoicePdfData _buildPdfData(Company company, Client client, Invoice invoice, List<InvoiceItem> items, Uint8List? logoBytes) {
+    return InvoicePdfData(
+      company: CompanyInfo(
+        name: company.name,
+        logoBytes: logoBytes,
+        address: company.address,
+        phone: company.phone,
+        email: company.email,
+        bankDetails: company.bankDetails,
+      ),
+      client: ClientInfo(
+        name: client.name,
+        contactPerson: client.contactPerson,
+        phone: client.phone,
+        address: client.address,
+      ),
+      number: invoice.number,
+      issueDate: invoice.issueDate,
+      dueDate: invoice.dueDate,
+      currency: invoice.currency,
+      items: items.map((e) => InvoiceLine(
+        description: e.description,
+        quantity: e.quantity,
+        unitPriceMinor: e.unitPriceMinor,
+      )).toList(),
+      notes: invoice.notes,
+    );
+  }
+
   Future<void> _shareInvoice(BuildContext context, WidgetRef ref, Company company, Client client, Invoice invoice, List<InvoiceItem> items) async {
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
       final logoBytes = await _loadLogoBytes(company.logoPath);
-      final pdfData = InvoicePdfData(
-        company: CompanyInfo(
-          name: company.name,
-          logoBytes: logoBytes,
-          address: company.address,
-          phone: company.phone,
-          email: company.email,
-          bankDetails: company.bankDetails,
-        ),
-        client: ClientInfo(
-          name: client.name,
-          contactPerson: client.contactPerson,
-          phone: client.phone,
-          address: client.address,
-        ),
-        number: invoice.number,
-        issueDate: invoice.issueDate,
-        dueDate: invoice.dueDate,
-        currency: invoice.currency,
-        items: items.map((e) => InvoiceLine(
-          description: e.description,
-          quantity: e.quantity,
-          unitPriceMinor: e.unitPriceMinor,
-        )).toList(),
-        notes: invoice.notes,
-      );
-
+      final pdfData = _buildPdfData(company, client, invoice, items, logoBytes);
       final pdfBytes = await buildInvoicePdf(pdfData);
-      if (context.mounted) {
-        Navigator.pop(context); // Dismiss loading dialog
-        await shareInvoicePdf(pdfBytes, invoice.number);
-      }
+      nav.pop(); // Dismiss loading dialog
+      await shareInvoicePdf(pdfBytes, invoice.number);
     } catch (e) {
-      if (context.mounted) {
-        Navigator.pop(context); // Dismiss loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ أثناء مشاركة الفاتورة: $e'), backgroundColor: Colors.red),
-        );
-      }
+      nav.pop(); // Dismiss loading dialog
+      messenger.showSnackBar(
+        SnackBar(content: Text('خطأ أثناء مشاركة الفاتورة: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
   Future<void> _previewInvoice(BuildContext context, WidgetRef ref, Company company, Client client, Invoice invoice, List<InvoiceItem> items) async {
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
       final logoBytes = await _loadLogoBytes(company.logoPath);
-      final pdfData = InvoicePdfData(
-        company: CompanyInfo(
-          name: company.name,
-          logoBytes: logoBytes,
-          address: company.address,
-          phone: company.phone,
-          email: company.email,
-          bankDetails: company.bankDetails,
-        ),
-        client: ClientInfo(
-          name: client.name,
-          contactPerson: client.contactPerson,
-          phone: client.phone,
-          address: client.address,
-        ),
-        number: invoice.number,
-        issueDate: invoice.issueDate,
-        dueDate: invoice.dueDate,
-        currency: invoice.currency,
-        items: items.map((e) => InvoiceLine(
-          description: e.description,
-          quantity: e.quantity,
-          unitPriceMinor: e.unitPriceMinor,
-        )).toList(),
-        notes: invoice.notes,
-      );
-
+      final pdfData = _buildPdfData(company, client, invoice, items, logoBytes);
       final pdfBytes = await buildInvoicePdf(pdfData);
-      if (context.mounted) {
-        Navigator.pop(context); // Dismiss loading dialog
-        await previewInvoicePdf(pdfBytes);
-      }
+      nav.pop(); // Dismiss loading dialog
+      await previewInvoicePdf(pdfBytes);
     } catch (e) {
-      if (context.mounted) {
-        Navigator.pop(context); // Dismiss loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ أثناء معاينة الفاتورة: $e'), backgroundColor: Colors.red),
-        );
-      }
+      nav.pop(); // Dismiss loading dialog
+      messenger.showSnackBar(
+        SnackBar(content: Text('خطأ أثناء معاينة الفاتورة: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 }
