@@ -57,6 +57,13 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen> {
                 title: Text(client.name),
                 actions: [
                   IconButton(
+                    icon: const Icon(Icons.autorenew),
+                    tooltip: 'إدارة الاشتراكات',
+                    onPressed: () {
+                      context.go('/clients/${client.id}/subscriptions');
+                    },
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.edit),
                     onPressed: () {
                       context.go('/clients/edit/${client.id}');

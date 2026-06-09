@@ -7,6 +7,8 @@ import 'package:fawatir/features/settings/presentation/settings_screen.dart';
 import 'package:fawatir/features/company/presentation/company_form_screen.dart';
 import 'package:fawatir/features/clients/presentation/client_form_screen.dart';
 import 'package:fawatir/features/clients/presentation/client_detail_screen.dart';
+import 'package:fawatir/features/subscriptions/presentation/subscriptions_screen.dart';
+import 'package:fawatir/features/subscriptions/presentation/subscription_form_screen.dart';
 import 'package:fawatir/features/invoices/presentation/invoice_form_screen.dart';
 import 'package:fawatir/features/invoices/presentation/invoice_detail_screen.dart';
 
@@ -56,6 +58,36 @@ final goRouter = GoRouter(
                     final id = int.tryParse(idStr ?? '') ?? 0;
                     return ClientDetailScreen(clientId: id);
                   },
+                  routes: [
+                    GoRoute(
+                      path: 'subscriptions',
+                      builder: (context, state) {
+                        final idStr = state.pathParameters['id'];
+                        final id = int.tryParse(idStr ?? '') ?? 0;
+                        return SubscriptionsScreen(clientId: id);
+                      },
+                      routes: [
+                        GoRoute(
+                          path: 'add',
+                          builder: (context, state) {
+                            final idStr = state.pathParameters['id'];
+                            final id = int.tryParse(idStr ?? '') ?? 0;
+                            return SubscriptionFormScreen(clientId: id);
+                          },
+                        ),
+                        GoRoute(
+                          path: 'edit/:subId',
+                          builder: (context, state) {
+                            final idStr = state.pathParameters['id'];
+                            final id = int.tryParse(idStr ?? '') ?? 0;
+                            final subIdStr = state.pathParameters['subId'];
+                            final subId = int.tryParse(subIdStr ?? '') ?? 0;
+                            return SubscriptionFormScreen(clientId: id, subscriptionId: subId);
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -29,6 +29,10 @@ class SubscriptionRepository {
       SubscriptionsCompanion(isActive: Value(active)),
     );
   }
+
+  Future<Subscription?> getSubscription(int id) {
+    return (_db.select(_db.subscriptions)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+  }
 }
 
 final subscriptionRepositoryProvider = Provider<SubscriptionRepository>(
