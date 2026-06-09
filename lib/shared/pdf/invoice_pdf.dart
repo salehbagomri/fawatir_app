@@ -160,27 +160,33 @@ pw.Widget _metaRow(String l, String v, pw.Font medium) => pw.Padding(
       ]),
     );
 
-pw.Widget _parties(InvoicePdfData d, pw.Font bold, pw.Font medium) => pw.Container(
-      width: double.infinity,
-      padding: const pw.EdgeInsets.all(14),
-      decoration: pw.BoxDecoration(
-          color: _zebra, borderRadius: pw.BorderRadius.circular(6)),
-      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-        pw.Text('فاتورة إلى',
-            style: pw.TextStyle(font: medium, fontSize: 9, color: _muted)),
-        pw.SizedBox(height: 4),
-        pw.Text(d.client.name,
-            style: pw.TextStyle(font: bold, fontSize: 12, color: _dark)),
-        if (d.client.contactPerson != null)
-          pw.Text(d.client.contactPerson!,
-              style: pw.TextStyle(fontSize: 9, color: _muted)),
-        if (d.client.address != null)
-          pw.Text(d.client.address!,
-              style: pw.TextStyle(fontSize: 9, color: _muted)),
-        if (d.client.phone != null)
-          pw.Text(d.client.phone!,
-              style: pw.TextStyle(fontSize: 9, color: _muted)),
-      ]),
+pw.Widget _parties(InvoicePdfData d, pw.Font bold, pw.Font medium) =>
+    pw.Directionality(
+      textDirection: pw.TextDirection.rtl,
+      child: pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.all(14),
+        decoration: pw.BoxDecoration(
+            color: _zebra, borderRadius: pw.BorderRadius.circular(6)),
+        child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('فاتورة إلى',
+                  style: pw.TextStyle(font: medium, fontSize: 9, color: _muted)),
+              pw.SizedBox(height: 4),
+              pw.Text(d.client.name,
+                  style: pw.TextStyle(font: bold, fontSize: 12, color: _dark)),
+              if (d.client.contactPerson != null)
+                pw.Text(d.client.contactPerson!,
+                    style: pw.TextStyle(fontSize: 9, color: _muted)),
+              if (d.client.address != null)
+                pw.Text(d.client.address!,
+                    style: pw.TextStyle(fontSize: 9, color: _muted)),
+              if (d.client.phone != null)
+                pw.Text(d.client.phone!,
+                    style: pw.TextStyle(fontSize: 9, color: _muted)),
+            ]),
+      ),
     );
 
 pw.Widget _itemsTable(InvoicePdfData d, pw.Font bold, pw.Font medium) {
@@ -188,7 +194,7 @@ pw.Widget _itemsTable(InvoicePdfData d, pw.Font bold, pw.Font medium) {
   // Visual RTL order (right→left): الوصف، الكمية، سعر الوحدة، الإجمالي
   final rows = <pw.TableRow>[
     pw.TableRow(decoration: pw.BoxDecoration(color: _accent), children: [
-      _headCell('الإجمالي', medium, pw.TextAlign.center),
+      _headCell('الإجمالي', medium, pw.TextAlign.left),
       _headCell('سعر الوحدة', medium, pw.TextAlign.center),
       _headCell('الكمية', medium, pw.TextAlign.center),
       _headCell('الوصف', medium, pw.TextAlign.right),
@@ -200,7 +206,7 @@ pw.Widget _itemsTable(InvoicePdfData d, pw.Font bold, pw.Font medium) {
           border: pw.Border(bottom: pw.BorderSide(color: _line, width: 0.5)),
         ),
         children: [
-          _bodyCell(_money(d.items[i].lineTotalMinor, d.currency), pw.TextAlign.center,
+          _bodyCell(_money(d.items[i].lineTotalMinor, d.currency), pw.TextAlign.left,
               bold: bold),
           _bodyCell(_money(d.items[i].unitPriceMinor, d.currency), pw.TextAlign.center),
           _bodyCell(_qty(d.items[i].quantity), pw.TextAlign.center),
@@ -209,10 +215,10 @@ pw.Widget _itemsTable(InvoicePdfData d, pw.Font bold, pw.Font medium) {
       ),
   ];
   return pw.Table(columnWidths: const {
-    0: pw.FlexColumnWidth(2),
-    1: pw.FlexColumnWidth(2),
-    2: pw.FlexColumnWidth(1.2),
-    3: pw.FlexColumnWidth(4.2),
+    0: pw.FlexColumnWidth(1.6),
+    1: pw.FlexColumnWidth(1.6),
+    2: pw.FlexColumnWidth(1),
+    3: pw.FlexColumnWidth(5.2),
   }, children: rows);
 }
 
