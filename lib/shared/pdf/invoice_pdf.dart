@@ -273,7 +273,6 @@ pw.Widget _notes(String notes, pw.Font medium) => pw.Column(
 
 pw.Widget _footer(CompanyInfo c, pw.Font medium) {
   final lines = <String>[
-    if (c.bankDetails != null) 'التحويل عبر : ${c.bankDetails!}',
     [
       if (c.phone != null) c.phone!,
       if (c.email != null) c.email!,

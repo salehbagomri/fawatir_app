@@ -154,11 +154,11 @@ pw.Widget _openingRow(StatementPdfData d, pw.Font medium) => pw.Container(
 pw.Widget _table(StatementPdfData d, pw.Font bold, pw.Font medium) {
   final rows = <pw.TableRow>[
     pw.TableRow(decoration: pw.BoxDecoration(color: _accent), children: [
-      _h('التاريخ', medium),
-      _h('البيان', medium),
-      _h('مدين', medium),
-      _h('دائن', medium),
       _h('الرصيد', medium),
+      _h('دائن', medium),
+      _h('مدين', medium),
+      _h('البيان', medium),
+      _h('التاريخ', medium),
     ]),
     for (var i = 0; i < d.entries.length; i++)
       pw.TableRow(
@@ -167,24 +167,24 @@ pw.Widget _table(StatementPdfData d, pw.Font bold, pw.Font medium) {
           border: pw.Border(bottom: pw.BorderSide(color: _line, width: 0.5)),
         ),
         children: [
-          _c(_date(d.entries[i].date)),
-          _c(d.entries[i].reference),
-          _c(d.entries[i].debitMinor == 0
-              ? '-'
-              : _money(d.entries[i].debitMinor, d.currency)),
+          _c(_money(d.entries[i].runningBalanceMinor, d.currency)),
           _c(d.entries[i].creditMinor == 0
               ? '-'
               : _money(d.entries[i].creditMinor, d.currency)),
-          _c(_money(d.entries[i].runningBalanceMinor, d.currency)),
+          _c(d.entries[i].debitMinor == 0
+              ? '-'
+              : _money(d.entries[i].debitMinor, d.currency)),
+          _c(d.entries[i].reference),
+          _c(_date(d.entries[i].date)),
         ],
       ),
   ];
   return pw.Table(columnWidths: const {
-    0: pw.FlexColumnWidth(1.6),
-    1: pw.FlexColumnWidth(2.6),
+    0: pw.FlexColumnWidth(1.9),
+    1: pw.FlexColumnWidth(1.8),
     2: pw.FlexColumnWidth(1.8),
-    3: pw.FlexColumnWidth(1.8),
-    4: pw.FlexColumnWidth(1.9),
+    3: pw.FlexColumnWidth(2.6),
+    4: pw.FlexColumnWidth(1.6),
   }, children: rows);
 }
 
@@ -233,7 +233,6 @@ pw.Widget _closing(StatementPdfData d, pw.Font bold) => pw.Row(
 
 pw.Widget _footer(CompanyInfo c, pw.Font medium) {
   final lines = <String>[
-    if (c.bankDetails != null) c.bankDetails!,
     [
       if (c.phone != null) c.phone!,
       if (c.email != null) c.email!,

@@ -82,7 +82,13 @@ class StatementRepository {
           'فاتورة ${inv.number}', (inv.totalMinor * inv.fxRateToAccount).round(), 0));
     }
     for (final p in payments) {
-      all.add(_Raw(p.paymentDate, StatementEntryType.payment, 'تحصيل', 0,
+      final receiptNumber =
+          'REC-${p.paymentDate.year}-${p.id.toString().padLeft(4, '0')}';
+      all.add(_Raw(
+          p.paymentDate,
+          StatementEntryType.payment,
+          'سند تحصيل $receiptNumber',
+          0,
           (p.amountMinor * p.fxRateToAccount).round()));
     }
     all.sort((a, b) => a.date.compareTo(b.date));
