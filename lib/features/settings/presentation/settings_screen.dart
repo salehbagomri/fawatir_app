@@ -272,26 +272,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (!mounted) return;
 
     _setLoading(true);
+
+    // Phase 1: Download backup to temp file (DB stays OPEN — UI still works)
+    String? tempPath;
     try {
       final backupService = ref.read(backupServiceProvider);
-      final imported = await backupService.restoreFromDrive();
-
-      if (imported) {
-        // Database is now closed — do NOT attempt to show dialogs or update UI
-        // as all active streams are broken. Exit immediately and let the OS restart the app.
-        exit(0);
-      }
+      tempPath = await backupService.downloadBackupToTemp();
     } catch (e) {
       if (!mounted) return;
+      _setLoading(false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceAll('Exception: ', '')),
           backgroundColor: Colors.red,
         ),
       );
-    } finally {
-      _setLoading(false);
+      return;
     }
+
+    if (!mounted) return;
+    _setLoading(false);
+
+    // Phase 2: DB is still open here — show success dialog safely
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('✅ تمت الاستعادة بنجاح'),
+        content: const Text(
+          'تم تحميل النسخة الاحتياطية بنجاح.\nاضغط "موافق" لإغلاق التطبيق وإعادة فتحه لتطبيق التغييرات.',
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              // Phase 3: Apply backup (closes DB) then exit
+              final backupService = ref.read(backupServiceProvider);
+              await backupService.applyRestoredBackup(tempPath!);
+              exit(0);
+            },
+            child: const Text('موافق (إغلاق وإعادة التشغيل)'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _formatDateTime(DateTime date) {

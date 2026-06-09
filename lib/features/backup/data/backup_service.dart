@@ -207,75 +207,65 @@ class BackupService {
     }
   }
 
-  Future<bool> restoreFromDrive() async {
-    try {
-      final driveApi = await _getDriveApi().timeout(const Duration(seconds: 30));
-      if (driveApi == null) {
-        throw Exception('الرجاء تسجيل الدخول أولاً');
-      }
-
-      final list = await driveApi.files.list(
-        q: "name = 'fawatir_db.sqlite'",
-        spaces: 'appDataFolder',
-      ).timeout(const Duration(seconds: 30));
-
-      if (list.files == null || list.files!.isEmpty) {
-        throw Exception('لم يتم العثور على نسخة احتياطية في Google Drive');
-      }
-
-      final fileId = list.files!.first.id!;
-
-      final drive.Media media =
-          await driveApi.files.get(
-                fileId,
-                downloadOptions: drive.DownloadOptions.fullMedia,
-              )
-              .timeout(const Duration(seconds: 30))
-              as drive.Media;
-
-      // 1. Download to a temporary file first while DB is still open and active
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/temp_restore_db.sqlite');
-      if (await tempFile.exists()) {
-        await tempFile.delete();
-      }
-
-      final iosSink = tempFile.openWrite();
-      await iosSink
-          .addStream(media.stream)
-          .timeout(const Duration(seconds: 60));
-      await iosSink.close();
-
-      // 2. Now that download completed successfully, close DB executor
-      await _db.close();
-
-      // 3. Delete old DB files (including WAL/SHM) and copy the new one
-      final localFile = await _db.databaseFile();
-      final walFile = File('${localFile.path}-wal');
-      final shmFile = File('${localFile.path}-shm');
-
-      if (await localFile.exists()) {
-        await localFile.delete();
-      }
-      if (await walFile.exists()) {
-        await walFile.delete();
-      }
-      if (await shmFile.exists()) {
-        await shmFile.delete();
-      }
-
-      // Copy local temp file to destination database path
-      await tempFile.copy(localFile.path);
-
-      // Clean up the temporary file
-      if (await tempFile.exists()) {
-        await tempFile.delete();
-      }
-
-      return true;
-    } catch (e) {
-      throw Exception('فشل استعادة البيانات من Google Drive: $e');
+  /// Phase 1: Download backup from Drive to a local temp file.
+  /// The database remains OPEN during this step — safe for UI updates.
+  Future<String> downloadBackupToTemp() async {
+    final driveApi = await _getDriveApi().timeout(const Duration(seconds: 30));
+    if (driveApi == null) {
+      throw Exception('الرجاء تسجيل الدخول أولاً');
     }
+
+    final list = await driveApi.files.list(
+      q: "name = 'fawatir_db.sqlite'",
+      spaces: 'appDataFolder',
+    ).timeout(const Duration(seconds: 30));
+
+    if (list.files == null || list.files!.isEmpty) {
+      throw Exception('لم يتم العثور على نسخة احتياطية في Google Drive');
+    }
+
+    final fileId = list.files!.first.id!;
+
+    final drive.Media media =
+        await driveApi.files.get(
+              fileId,
+              downloadOptions: drive.DownloadOptions.fullMedia,
+            )
+            .timeout(const Duration(seconds: 30))
+            as drive.Media;
+
+    final tempDir = await getTemporaryDirectory();
+    final tempFile = File('${tempDir.path}/temp_restore_db.sqlite');
+    if (await tempFile.exists()) {
+      await tempFile.delete();
+    }
+
+    final iosSink = tempFile.openWrite();
+    await iosSink
+        .addStream(media.stream)
+        .timeout(const Duration(seconds: 60));
+    await iosSink.close();
+
+    return tempFile.path;
+  }
+
+  /// Phase 2: Apply the downloaded temp file as the new database.
+  /// Closes the DB, swaps files, and returns. Caller should call exit(0) after.
+  Future<void> applyRestoredBackup(String tempFilePath) async {
+    await _db.close();
+
+    final localFile = await _db.databaseFile();
+    final walFile = File('${localFile.path}-wal');
+    final shmFile = File('${localFile.path}-shm');
+    final tempFile = File(tempFilePath);
+
+    if (await localFile.exists()) await localFile.delete();
+    if (await walFile.exists()) await walFile.delete();
+    if (await shmFile.exists()) await shmFile.delete();
+
+    await tempFile.copy(localFile.path);
+
+    if (await tempFile.exists()) await tempFile.delete();
   }
 }
 
