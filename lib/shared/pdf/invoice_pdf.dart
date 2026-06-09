@@ -243,7 +243,7 @@ pw.Widget _totals(InvoicePdfData d, pw.Font bold) => pw.Row(
       children: [
         pw.Container(
           width: 220,
-          padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: pw.BoxDecoration(
               color: _accent, borderRadius: pw.BorderRadius.circular(6)),
           child: pw.Row(
@@ -273,7 +273,7 @@ pw.Widget _notes(String notes, pw.Font medium) => pw.Column(
 
 pw.Widget _footer(CompanyInfo c, pw.Font medium) {
   final lines = <String>[
-    if (c.bankDetails != null) c.bankDetails!,
+    if (c.bankDetails != null) 'التحويل عبر : ${c.bankDetails!}',
     [
       if (c.phone != null) c.phone!,
       if (c.email != null) c.email!,
