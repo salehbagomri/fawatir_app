@@ -154,7 +154,7 @@ pw.Widget _openingRow(StatementPdfData d, pw.Font medium) => pw.Container(
 pw.Widget _table(StatementPdfData d, pw.Font bold, pw.Font medium) {
   final rows = <pw.TableRow>[
     pw.TableRow(decoration: pw.BoxDecoration(color: _accent), children: [
-      _h('الرصيد', medium),
+      _h('الرصيد', medium, align: pw.TextAlign.left),
       _h('دائن', medium),
       _h('مدين', medium),
       _h('البيان', medium),
@@ -167,7 +167,7 @@ pw.Widget _table(StatementPdfData d, pw.Font bold, pw.Font medium) {
           border: pw.Border(bottom: pw.BorderSide(color: _line, width: 0.5)),
         ),
         children: [
-          _c(_money(d.entries[i].runningBalanceMinor, d.currency)),
+          _c(_money(d.entries[i].runningBalanceMinor, d.currency), align: pw.TextAlign.left),
           _c(d.entries[i].creditMinor == 0
               ? '-'
               : _money(d.entries[i].creditMinor, d.currency)),
@@ -180,23 +180,24 @@ pw.Widget _table(StatementPdfData d, pw.Font bold, pw.Font medium) {
       ),
   ];
   return pw.Table(columnWidths: const {
-    0: pw.FlexColumnWidth(1.9),
-    1: pw.FlexColumnWidth(1.8),
-    2: pw.FlexColumnWidth(1.8),
-    3: pw.FlexColumnWidth(2.6),
-    4: pw.FlexColumnWidth(1.6),
+    0: pw.FlexColumnWidth(1.4),
+    1: pw.FlexColumnWidth(1.3),
+    2: pw.FlexColumnWidth(1.3),
+    3: pw.FlexColumnWidth(4.2),
+    4: pw.FlexColumnWidth(1.5),
   }, children: rows);
 }
 
-pw.Widget _h(String t, pw.Font medium) => pw.Padding(
+pw.Widget _h(String t, pw.Font medium, {pw.TextAlign align = pw.TextAlign.right}) => pw.Padding(
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 7),
       child: pw.Text(t,
-          style: pw.TextStyle(font: medium, fontSize: 9, color: PdfColors.white)),
+          style: pw.TextStyle(font: medium, fontSize: 9, color: PdfColors.white),
+          textAlign: align),
     );
 
-pw.Widget _c(String t) => pw.Padding(
+pw.Widget _c(String t, {pw.TextAlign align = pw.TextAlign.right}) => pw.Padding(
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-      child: pw.Text(t, style: pw.TextStyle(fontSize: 8.5, color: _dark)),
+      child: pw.Text(t, style: pw.TextStyle(fontSize: 8.5, color: _dark), textAlign: align),
     );
 
 pw.Widget _totals(StatementPdfData d, pw.Font medium) => pw.Row(
