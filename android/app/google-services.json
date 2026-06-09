@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "678878516062",
+    "project_id": "fawatir-app",
+    "storage_bucket": "fawatir-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:678878516062:android:6badc69ae82fb98c7fb5cf",
+        "android_client_info": {
+          "package_name": "com.bagomri.fawatir"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "678878516062-009cn4p8uubtk71l1kh9pmvbpiblva03.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDTTEJET0rwX5Y68cytBZqTRTFYvDNyb_w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "678878516062-009cn4p8uubtk71l1kh9pmvbpiblva03.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

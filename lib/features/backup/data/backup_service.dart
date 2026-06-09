@@ -11,7 +11,8 @@ import '../../../data/db/database.dart';
 /// معرّف عميل الويب (Web Client ID) الخاص بك من Google Cloud Console.
 /// مطلوب على نظام Android لتفعيل النسخ الاحتياطي السحابي عبر Google Drive.
 /// مثال: '1234567890-abcdefg.apps.googleusercontent.com'
-const String? googleDriveServerClientId = null;
+const String googleDriveServerClientId =
+    '678878516062-009cn4p8uubtk71l1kh9pmvbpiblva03.apps.googleusercontent.com';
 
 class BackupService {
   final AppDatabase _db;
@@ -31,10 +32,13 @@ class BackupService {
   Future<void> exportBackup() async {
     try {
       final tmpDir = await getTemporaryDirectory();
-      final tmp = '${tmpDir.path}/fawatir_backup_${DateTime.now().millisecondsSinceEpoch}.sqlite';
+      final tmp =
+          '${tmpDir.path}/fawatir_backup_${DateTime.now().millisecondsSinceEpoch}.sqlite';
       await _db.customStatement("VACUUM INTO '$tmp'");
-      
-      await Share.shareXFiles([XFile(tmp)], text: 'نسخة احتياطية لقاعدة بيانات فواتير');
+
+      await Share.shareXFiles([
+        XFile(tmp),
+      ], text: 'نسخة احتياطية لقاعدة بيانات فواتير');
     } catch (e) {
       throw Exception('فشل تصدير النسخة الاحتياطية: $e');
     }
@@ -42,9 +46,7 @@ class BackupService {
 
   Future<bool> importBackup() async {
     try {
-      final result = await FilePicker.pickFiles(
-        type: FileType.any,
-      );
+      final result = await FilePicker.pickFiles(type: FileType.any);
 
       if (result == null || result.files.single.path == null) {
         return false;
@@ -85,8 +87,8 @@ class BackupService {
       final account = await GoogleSignIn.instance.authenticate();
       final scopes = [drive.DriveApi.driveAppdataScope];
       final authClient = account.authorizationClient;
-      await authClient.authorizationForScopes(scopes)
-          ?? await authClient.authorizeScopes(scopes);
+      await authClient.authorizationForScopes(scopes) ??
+          await authClient.authorizeScopes(scopes);
       return account;
     } catch (e) {
       throw Exception('فشل تسجيل الدخول: $e');
@@ -106,7 +108,9 @@ class BackupService {
     final account = await getCurrentUser();
     if (account == null) return false;
     try {
-      final auth = await account.authorizationClient.authorizationForScopes([drive.DriveApi.driveAppdataScope]);
+      final auth = await account.authorizationClient.authorizationForScopes([
+        drive.DriveApi.driveAppdataScope,
+      ]);
       return auth != null;
     } catch (e) {
       return false;
@@ -120,13 +124,14 @@ class BackupService {
   Future<drive.DriveApi?> _getDriveApi() async {
     final account = await getCurrentUser();
     if (account == null) return null;
-    
+
     final scopes = [drive.DriveApi.driveAppdataScope];
     final authClient = account.authorizationClient;
-    
-    final auth = await authClient.authorizationForScopes(scopes)
-        ?? await authClient.authorizeScopes(scopes);
-    
+
+    final auth =
+        await authClient.authorizationForScopes(scopes) ??
+        await authClient.authorizeScopes(scopes);
+
     final client = auth.authClient(scopes: scopes);
     return drive.DriveApi(client);
   }
@@ -171,11 +176,7 @@ class BackupService {
 
       if (list.files != null && list.files!.isNotEmpty) {
         final fileId = list.files!.first.id!;
-        await driveApi.files.update(
-          drive.File(),
-          fileId,
-          uploadMedia: media,
-        );
+        await driveApi.files.update(drive.File(), fileId, uploadMedia: media);
       } else {
         final fileToUpload = drive.File()
           ..name = 'fawatir_db.sqlite'
@@ -205,10 +206,12 @@ class BackupService {
 
       final fileId = list.files!.first.id!;
 
-      final drive.Media media = await driveApi.files.get(
-        fileId,
-        downloadOptions: drive.DownloadOptions.fullMedia,
-      ) as drive.Media;
+      final drive.Media media =
+          await driveApi.files.get(
+                fileId,
+                downloadOptions: drive.DownloadOptions.fullMedia,
+              )
+              as drive.Media;
 
       // Close the DB first
       await _db.close();
