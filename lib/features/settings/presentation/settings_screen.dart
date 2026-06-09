@@ -1,7 +1,8 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:restart_app/restart_app.dart';
 import 'package:fawatir/app/theme.dart';
 import 'package:fawatir/features/backup/data/backup_service.dart';
 
@@ -130,15 +131,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           context: context,
           barrierDismissible: false,
           builder: (context) => AlertDialog(
-            title: const Text('تمت الاستعادة بنجاح'),
-            content: const Text('تمت الاستعادة بنجاح. الرجاء إغلاق التطبيق وإعادة فتحه.'),
+            title: const Text('✅ تمت الاستعادة بنجاح'),
+            content: Text(
+              kDebugMode
+                  ? 'تم استيراد النسخة الاحتياطية بنجاح.\n\nبما أن التطبيق يعمل في وضع التطوير (Debug Mode)، يرجى إغلاقه والتشغيل يدوياً.\n(في وضع التشغيل النهائي Release Mode، سيعاد تشغيل التطبيق تلقائياً).'
+                  : 'تم استيراد النسخة الاحتياطية بنجاح. سيتم إعادة تشغيل التطبيق تلقائياً لتطبيق التغييرات.',
+            ),
             actions: [
-              TextButton(
-                onPressed: () {
+              ElevatedButton(
+                onPressed: () async {
                   Navigator.pop(context);
-                  exit(0);
+                  await Restart.restartApp();
                 },
-                child: const Text('موافق (إغلاق التطبيق)'),
+                child: const Text('موافق'),
               ),
             ],
           ),
@@ -299,19 +304,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: const Text('✅ تمت الاستعادة بنجاح'),
-        content: const Text(
-          'تم تحميل النسخة الاحتياطية بنجاح.\nاضغط "موافق" لإغلاق التطبيق وإعادة فتحه لتطبيق التغييرات.',
+        content: Text(
+          kDebugMode
+              ? 'تم تحميل واستعادة النسخة الاحتياطية بنجاح.\n\nبما أن التطبيق يعمل في وضع التطوير (Debug Mode)، يرجى إغلاقه والتشغيل يدوياً.\n(في وضع التشغيل النهائي Release Mode، سيعاد تشغيل التطبيق تلقائياً).'
+              : 'تم تحميل واستعادة النسخة الاحتياطية بنجاح. سيتم إعادة تشغيل التطبيق تلقائياً لتطبيق التغييرات.',
         ),
         actions: [
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              // Phase 3: Apply backup (closes DB) then exit
+              // Phase 3: Apply backup (closes DB) then restart app automatically
               final backupService = ref.read(backupServiceProvider);
               await backupService.applyRestoredBackup(tempPath!);
-              exit(0);
+              await Restart.restartApp();
             },
-            child: const Text('موافق (إغلاق وإعادة التشغيل)'),
+            child: const Text('موافق'),
           ),
         ],
       ),
