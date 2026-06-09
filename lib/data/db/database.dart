@@ -29,7 +29,7 @@ class AppDatabase extends _$AppDatabase {
 }
 
 QueryExecutor _openConnection() {
-  return driftDatabase(
+  final connection = driftDatabase(
     name: 'fawatir_db',
     native: DriftNativeOptions(
       databasePath: () async {
@@ -37,6 +37,11 @@ QueryExecutor _openConnection() {
         return '${dbFolder.path}/fawatir_db.sqlite';
       },
     ),
+  ) as DatabaseConnection;
+  return DatabaseConnection(
+    connection.executor,
+    streamQueries: connection.streamQueries,
+    closeStreamsSynchronously: true,
   );
 }
 
