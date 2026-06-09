@@ -144,6 +144,7 @@ pw.Widget _metaRow(String l, String v, pw.Font medium) => pw.Padding(
 
 pw.Widget _receivedFrom(ReceiptPdfData d, pw.Font bold, pw.Font medium) =>
     pw.Container(
+      width: double.infinity,
       padding: const pw.EdgeInsets.all(14),
       decoration: pw.BoxDecoration(
           color: _zebra, borderRadius: pw.BorderRadius.circular(6)),
@@ -232,7 +233,6 @@ pw.Widget _signature(pw.Font medium) => pw.Row(
 
 pw.Widget _footer(CompanyInfo c, pw.Font medium) {
   final lines = <String>[
-    if (c.bankDetails != null) c.bankDetails!,
     [
       if (c.phone != null) c.phone!,
       if (c.email != null) c.email!,

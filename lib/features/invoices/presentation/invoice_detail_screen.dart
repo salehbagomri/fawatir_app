@@ -747,6 +747,7 @@ class _RecordPaymentSheetState extends State<RecordPaymentSheet> {
                   DropdownMenuItem(value: 'تحويل بنكي', child: Text('تحويل بنكي')),
                   DropdownMenuItem(value: 'محفظة', child: Text('محفظة')),
                   DropdownMenuItem(value: 'نقد', child: Text('نقد')),
+                  DropdownMenuItem(value: 'تحويل عبر الشبكة الموحدة', child: Text('تحويل عبر الشبكة الموحدة')),
                   DropdownMenuItem(value: 'أخرى', child: Text('أخرى')),
                 ],
                 onChanged: (val) {
