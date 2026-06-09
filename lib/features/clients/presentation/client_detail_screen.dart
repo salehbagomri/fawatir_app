@@ -514,16 +514,23 @@ class ClientPaymentsTab extends ConsumerWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.payment, size: 16, color: AppColors.muted),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    payment.method ?? 'طريقة دفع غير محددة',
-                                    style: const TextStyle(fontSize: 13, color: AppColors.dark),
-                                  ),
-                                ],
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.payment, size: 16, color: AppColors.muted),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        payment.method ?? 'طريقة دفع غير محددة',
+                                        style: const TextStyle(fontSize: 13, color: AppColors.dark),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              const SizedBox(width: 12),
                               if (payment.invoiceId != null)
                                 FutureBuilder<Invoice?>(
                                   future: ref.read(invoiceRepositoryProvider).getInvoice(payment.invoiceId!),
