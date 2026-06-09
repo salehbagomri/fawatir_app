@@ -6,6 +6,7 @@ import 'package:fawatir/data/db/database.dart';
 import 'package:fawatir/data/db/tables.dart';
 import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/invoices/application/invoice_providers.dart';
+import 'package:fawatir/features/invoices/data/invoice_repository.dart';
 import 'package:fawatir/features/invoices/application/invoice_pdf_service.dart';
 import 'package:fawatir/features/payments/data/payment_repository.dart';
 import 'package:fawatir/shared/pdf/invoice_pdf.dart';
@@ -405,6 +406,42 @@ class InvoiceDetailScreen extends ConsumerWidget {
                           ),
                         ],
                       ),
+                      if (invoice.status == InvoiceStatus.draft) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue.shade700,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            icon: const Icon(Icons.verified),
+                            label: const Text('اعتماد الفاتورة', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            onPressed: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              try {
+                                await ref.read(invoiceRepositoryProvider).updateInvoiceStatus(invoice.id, InvoiceStatus.sent);
+                                ref.invalidate(invoiceByIdProvider(invoice.id));
+                                ref.invalidate(invoicesListProvider);
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text('تم اعتماد الفاتورة وتحويلها إلى مرسلة'),
+                                    backgroundColor: Colors.green,
+                                  ),
+                                );
+                              } catch (e) {
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text('خطأ أثناء اعتماد الفاتورة: $e'), backgroundColor: Colors.red),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                       if (invoice.status != InvoiceStatus.draft &&
                           invoice.status != InvoiceStatus.cancelled &&
                           invoice.status != InvoiceStatus.paid) ...[

@@ -5,10 +5,50 @@ import 'package:fawatir/app/theme.dart';
 import 'package:fawatir/core/money.dart';
 import 'package:fawatir/data/db/tables.dart';
 import 'package:fawatir/features/invoices/application/invoice_providers.dart';
+import 'package:fawatir/features/invoices/data/invoice_repository.dart';
 import 'package:fawatir/features/payments/data/payment_repository.dart';
 
 class InvoicesScreen extends ConsumerWidget {
   const InvoicesScreen({super.key});
+
+  Future<void> _generateInvoices(BuildContext context, WidgetRef ref) async {
+    final nav = Navigator.of(context, rootNavigator: true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final repo = ref.read(invoiceRepositoryProvider);
+      final createdIds = await repo.generateMonthlyInvoices();
+      nav.pop();
+
+      if (createdIds.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('لا فواتير جديدة لهذا الشهر'),
+            backgroundColor: AppColors.accent,
+          ),
+        );
+      } else {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('تم توليد ${createdIds.length} فاتورة كمسودة'),
+            backgroundColor: Colors.green.shade700,
+          ),
+        );
+        ref.read(invoiceStatusFilterProvider.notifier).setFilter(InvoiceStatus.draft);
+      }
+    } catch (e) {
+      nav.pop();
+      messenger.showSnackBar(
+        SnackBar(content: Text('خطأ أثناء توليد الفواتير: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
 
   Color _getStatusColor(InvoiceStatus status) {
     switch (status) {
@@ -59,6 +99,13 @@ class InvoicesScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('الفواتير'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.autorenew),
+              tooltip: 'توليد فواتير الشهر',
+              onPressed: () => _generateInvoices(context, ref),
+            ),
+          ],
         ),
         body: Column(
           children: [

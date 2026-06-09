@@ -91,6 +91,56 @@ class InvoiceRepository {
       return '$prefix$currentYear-$counterStr';
     });
   }
+
+  Future<List<int>> generateMonthlyInvoices({DateTime? forMonth}) async {
+    final target = forMonth ?? DateTime.now();
+    final periodMarker = DateTime(target.year, target.month, 1);
+    final monthStart = periodMarker;
+    final monthEnd = DateTime(target.year, target.month + 1, 0);
+
+    final subs = await (_db.select(_db.subscriptions)
+          ..where((s) => s.isActive.equals(true)))
+        .get();
+
+    final createdIds = <int>[];
+    for (final s in subs) {
+      final started = !s.startDate.isAfter(monthEnd);
+      final notEnded = s.endDate == null || !s.endDate!.isBefore(monthStart);
+      final notGenerated = s.lastGeneratedPeriod == null ||
+          s.lastGeneratedPeriod!.isBefore(periodMarker);
+      if (!(started && notEnded && notGenerated)) continue;
+
+      final number = await nextInvoiceNumber();
+      final issueDate =
+          DateTime(target.year, target.month, s.billingDayOfMonth);
+      final invoice = InvoicesCompanion.insert(
+        number: number,
+        clientId: s.clientId,
+        issueDate: issueDate,
+        currency: s.currency,
+        status: const Value(InvoiceStatus.draft),
+        subscriptionId: Value(s.id),
+      );
+
+      final items = [
+        InvoiceItemsCompanion(
+          invoiceId: const Value.absent(),
+          description: Value('${s.title} — ${target.month}/${target.year}'),
+          quantity: const Value(1.0),
+          unitPriceMinor: Value(s.unitPriceMinor),
+          lineTotalMinor: const Value(0),
+        )
+      ];
+
+      final id = await createInvoiceWithItems(invoice, items);
+      createdIds.add(id);
+
+      await (_db.update(_db.subscriptions)..where((x) => x.id.equals(s.id)))
+          .write(SubscriptionsCompanion(
+              lastGeneratedPeriod: Value(periodMarker)));
+    }
+    return createdIds;
+  }
 }
 
 final invoiceRepositoryProvider = Provider<InvoiceRepository>(
