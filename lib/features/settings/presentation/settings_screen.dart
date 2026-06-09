@@ -17,11 +17,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _googleUserEmail;
   DateTime? _lastBackupTime;
   bool _isDriveLoading = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _checkGoogleStatus();
+  }
+
+  void _setLoading(bool value) {
+    if (mounted) {
+      setState(() {
+        _isLoading = value;
+      });
+    }
   }
 
   Future<void> _checkGoogleStatus() async {
@@ -53,21 +62,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  void _showLoading(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-  }
-
   Future<void> _handleExport() async {
     final messenger = ScaffoldMessenger.of(context);
-    _showLoading(context);
+    _setLoading(true);
     try {
       await ref.read(backupServiceProvider).exportBackup();
       if (!mounted) return;
-      Navigator.pop(context);
       messenger.showSnackBar(
         const SnackBar(
           content: Text('تم تصدير النسخة الاحتياطية بنجاح'),
@@ -76,13 +76,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context);
       messenger.showSnackBar(
         SnackBar(
           content: Text('حدث خطأ أثناء التصدير: ${e.toString().replaceAll('Exception: ', '')}'),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -116,13 +117,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (confirm != true) return;
     if (!mounted) return;
 
-    _showLoading(context);
+    _setLoading(true);
     try {
       final imported = await ref.read(backupServiceProvider).importBackup();
       if (!mounted) return;
-      Navigator.pop(context);
 
       if (imported) {
+        _setLoading(false);
         await showDialog<void>(
           context: context,
           barrierDismissible: false,
@@ -143,23 +144,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context);
       messenger.showSnackBar(
         SnackBar(
           content: Text('حدث خطأ أثناء الاستيراد: ${e.toString().replaceAll('Exception: ', '')}'),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      _setLoading(false);
     }
   }
 
   Future<void> _handleGoogleSignIn() async {
-    _showLoading(context);
+    _setLoading(true);
     try {
       final backupService = ref.read(backupServiceProvider);
       final account = await backupService.signIn();
       if (!mounted) return;
-      Navigator.pop(context);
       if (account != null) {
         await _checkGoogleStatus();
         if (mounted) {
@@ -173,23 +174,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('فشل تسجيل الدخول: $e'),
+          content: Text('فشل تسجيل الدخول: ${e.toString().replaceAll('Exception: ', '')}'),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      _setLoading(false);
     }
   }
 
   Future<void> _handleGoogleSignOut() async {
-    _showLoading(context);
+    _setLoading(true);
     try {
       final backupService = ref.read(backupServiceProvider);
       await backupService.signOut();
       if (!mounted) return;
-      Navigator.pop(context);
       await _checkGoogleStatus();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -201,23 +202,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('فشل تسجيل الخروج: $e'),
+          content: Text('فشل تسجيل الخروج: ${e.toString().replaceAll('Exception: ', '')}'),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      _setLoading(false);
     }
   }
 
   Future<void> _handleGoogleBackup() async {
-    _showLoading(context);
+    _setLoading(true);
     try {
       final backupService = ref.read(backupServiceProvider);
       await backupService.backupToDrive();
       if (!mounted) return;
-      Navigator.pop(context);
       await _checkGoogleStatus();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -229,13 +230,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceAll('Exception: ', '')),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -267,14 +269,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (confirm != true) return;
     if (!mounted) return;
 
-    _showLoading(context);
+    _setLoading(true);
     try {
       final backupService = ref.read(backupServiceProvider);
       final imported = await backupService.restoreFromDrive();
       if (!mounted) return;
-      Navigator.pop(context);
 
       if (imported) {
+        _setLoading(false);
         await showDialog<void>(
           context: context,
           barrierDismissible: false,
@@ -295,13 +297,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString().replaceAll('Exception: ', '')),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -323,104 +326,115 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         appBar: AppBar(
           title: const Text('الإعدادات'),
         ),
-        body: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+        body: Stack(
           children: [
-            ListTile(
-              leading: const Icon(Icons.business, color: Colors.blueGrey),
-              title: const Text('بيانات الشركة'),
-              subtitle: const Text('الاسم، الشعار، بيانات البنك والاتصال'),
-              trailing: const Icon(Icons.chevron_left),
-              onTap: () {
-                context.go('/settings/company-setup');
-              },
-            ),
-            const Divider(),
-            
-            // Backup Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                'النسخ الاحتياطي اليدوي (أوفلاين)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.accent,
+            ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.business, color: Colors.blueGrey),
+                  title: const Text('بيانات الشركة'),
+                  subtitle: const Text('الاسم، الشعار، بيانات البنك والاتصال'),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: () {
+                    context.go('/settings/company-setup');
+                  },
                 ),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.file_upload, color: Colors.blue),
-              title: const Text('تصدير نسخة احتياطية'),
-              subtitle: const Text('حفظ نسخة احتياطية من البيانات على جهازك'),
-              onTap: _handleExport,
-            ),
-            ListTile(
-              leading: const Icon(Icons.file_download, color: Colors.orange),
-              title: const Text('استيراد نسخة احتياطية'),
-              subtitle: const Text('استعادة البيانات من ملف نسخة احتياطية محفوظ'),
-              onTap: _handleImport,
-            ),
-            const Divider(),
+                const Divider(),
+                
+                // Backup Header
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'النسخ الاحتياطي اليدوي (أوفلاين)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.file_upload, color: Colors.blue),
+                  title: const Text('تصدير نسخة احتياطية'),
+                  subtitle: const Text('حفظ نسخة احتياطية من البيانات على جهازك'),
+                  onTap: _handleExport,
+                ),
+                ListTile(
+                  leading: const Icon(Icons.file_download, color: Colors.orange),
+                  title: const Text('استيراد نسخة احتياطية'),
+                  subtitle: const Text('استعادة البيانات من ملف نسخة احتياطية محفوظ'),
+                  onTap: _handleImport,
+                ),
+                const Divider(),
 
-            // Cloud Backup Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Text(
-                'النسخ الاحتياطي السحابي (Google Drive)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.accent,
+                // Cloud Backup Header
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'النسخ الاحتياطي السحابي (Google Drive)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.accent,
+                    ),
+                  ),
                 ),
-              ),
+                if (_isDriveLoading)
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                else ...[
+                  if (!_isGoogleSignedIn)
+                    ListTile(
+                      leading: const Icon(Icons.cloud_queue, color: Colors.grey),
+                      title: const Text('ربط حساب Google Drive'),
+                      subtitle: const Text('تسجيل الدخول لتفعيل النسخ الاحتياطي السحابي'),
+                      trailing: const Icon(Icons.login),
+                      onTap: _handleGoogleSignIn,
+                    )
+                  else ...[
+                    ListTile(
+                      leading: const Icon(Icons.account_circle, color: Colors.blue),
+                      title: Text(_googleUserEmail ?? 'حساب غير معروف'),
+                      subtitle: Text(
+                        _lastBackupTime != null
+                            ? 'آخر نسخة احتياطية: ${_formatDateTime(_lastBackupTime!)}'
+                            : 'لا توجد نسخة احتياطية سابقة',
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.logout, color: Colors.red),
+                        tooltip: 'تسجيل الخروج',
+                        onPressed: _handleGoogleSignOut,
+                      ),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.cloud_upload, color: Colors.green),
+                      title: const Text('نسخ احتياطي الآن'),
+                      subtitle: const Text('رفع النسخة الحالية إلى Google Drive'),
+                      onTap: _handleGoogleBackup,
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.cloud_download, color: Colors.orange),
+                      title: const Text('استعادة من Google Drive'),
+                      subtitle: const Text('تنزيل واستعادة آخر نسخة احتياطية من السحاب'),
+                      onTap: _handleGoogleRestore,
+                    ),
+                  ],
+                ],
+                const Divider(),
+              ],
             ),
-            if (_isDriveLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16.0),
+            if (_isLoading)
+              Container(
+                color: const Color(0x59000000),
+                child: const Center(
                   child: CircularProgressIndicator(),
                 ),
-              )
-            else ...[
-              if (!_isGoogleSignedIn)
-                ListTile(
-                  leading: const Icon(Icons.cloud_queue, color: Colors.grey),
-                  title: const Text('ربط حساب Google Drive'),
-                  subtitle: const Text('تسجيل الدخول لتفعيل النسخ الاحتياطي السحابي'),
-                  trailing: const Icon(Icons.login),
-                  onTap: _handleGoogleSignIn,
-                )
-              else ...[
-                ListTile(
-                  leading: const Icon(Icons.account_circle, color: Colors.blue),
-                  title: Text(_googleUserEmail ?? 'حساب غير معروف'),
-                  subtitle: Text(
-                    _lastBackupTime != null
-                        ? 'آخر نسخة احتياطية: ${_formatDateTime(_lastBackupTime!)}'
-                        : 'لا توجد نسخة احتياطية سابقة',
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.logout, color: Colors.red),
-                    tooltip: 'تسجيل الخروج',
-                    onPressed: _handleGoogleSignOut,
-                  ),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.cloud_upload, color: Colors.green),
-                  title: const Text('نسخ احتياطي الآن'),
-                  subtitle: const Text('رفع النسخة الحالية إلى Google Drive'),
-                  onTap: _handleGoogleBackup,
-                ),
-                ListTile(
-                  leading: const Icon(Icons.cloud_download, color: Colors.orange),
-                  title: const Text('استعادة من Google Drive'),
-                  subtitle: const Text('تنزيل واستعادة آخر نسخة احتياطية من السحاب'),
-                  onTap: _handleGoogleRestore,
-                ),
-              ],
-            ],
-            const Divider(),
+              ),
           ],
         ),
       ),
