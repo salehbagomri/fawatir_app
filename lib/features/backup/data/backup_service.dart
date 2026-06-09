@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -171,7 +172,7 @@ class BackupService {
 
   Future<void> backupToDrive() async {
     try {
-      final driveApi = await _getDriveApi();
+      final driveApi = await _getDriveApi().timeout(const Duration(seconds: 30));
       if (driveApi == null) {
         throw Exception('الرجاء تسجيل الدخول أولاً');
       }
@@ -186,16 +187,20 @@ class BackupService {
       final list = await driveApi.files.list(
         q: "name = 'fawatir_db.sqlite'",
         spaces: 'appDataFolder',
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (list.files != null && list.files!.isNotEmpty) {
         final fileId = list.files!.first.id!;
-        await driveApi.files.update(drive.File(), fileId, uploadMedia: media);
+        await driveApi.files
+            .update(drive.File(), fileId, uploadMedia: media)
+            .timeout(const Duration(seconds: 45));
       } else {
         final fileToUpload = drive.File()
           ..name = 'fawatir_db.sqlite'
           ..parents = ['appDataFolder'];
-        await driveApi.files.create(fileToUpload, uploadMedia: media);
+        await driveApi.files
+            .create(fileToUpload, uploadMedia: media)
+            .timeout(const Duration(seconds: 45));
       }
     } catch (e) {
       throw Exception('فشل النسخ الاحتياطي إلى Google Drive: $e');
@@ -204,7 +209,7 @@ class BackupService {
 
   Future<bool> restoreFromDrive() async {
     try {
-      final driveApi = await _getDriveApi();
+      final driveApi = await _getDriveApi().timeout(const Duration(seconds: 30));
       if (driveApi == null) {
         throw Exception('الرجاء تسجيل الدخول أولاً');
       }
@@ -212,7 +217,7 @@ class BackupService {
       final list = await driveApi.files.list(
         q: "name = 'fawatir_db.sqlite'",
         spaces: 'appDataFolder',
-      );
+      ).timeout(const Duration(seconds: 30));
 
       if (list.files == null || list.files!.isEmpty) {
         throw Exception('لم يتم العثور على نسخة احتياطية في Google Drive');
@@ -225,18 +230,30 @@ class BackupService {
                 fileId,
                 downloadOptions: drive.DownloadOptions.fullMedia,
               )
+              .timeout(const Duration(seconds: 30))
               as drive.Media;
 
       // Close the DB first
       await _db.close();
 
       final localFile = await _db.databaseFile();
+      final walFile = File('${localFile.path}-wal');
+      final shmFile = File('${localFile.path}-shm');
+
       if (await localFile.exists()) {
         await localFile.delete();
       }
+      if (await walFile.exists()) {
+        await walFile.delete();
+      }
+      if (await shmFile.exists()) {
+        await shmFile.delete();
+      }
 
       final iosSink = localFile.openWrite();
-      await iosSink.addStream(media.stream);
+      await iosSink
+          .addStream(media.stream)
+          .timeout(const Duration(seconds: 60));
       await iosSink.close();
       return true;
     } catch (e) {
