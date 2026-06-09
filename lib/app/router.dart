@@ -4,6 +4,7 @@ import 'package:fawatir/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:fawatir/features/clients/presentation/clients_screen.dart';
 import 'package:fawatir/features/invoices/presentation/invoices_screen.dart';
 import 'package:fawatir/features/settings/presentation/settings_screen.dart';
+import 'package:fawatir/features/company/presentation/company_form_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
@@ -46,6 +47,12 @@ final goRouter = GoRouter(
             GoRoute(
               path: '/settings',
               builder: (context, state) => const SettingsScreen(),
+              routes: [
+                GoRoute(
+                  path: 'company-setup',
+                  builder: (context, state) => const CompanyFormScreen(),
+                ),
+              ],
             ),
           ],
         ),
