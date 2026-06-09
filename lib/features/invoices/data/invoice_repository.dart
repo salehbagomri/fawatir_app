@@ -63,6 +63,34 @@ class InvoiceRepository {
       InvoicesCompanion(status: Value(status)),
     );
   }
+
+  Future<String> nextInvoiceNumber() async {
+    return _db.transaction(() async {
+      var company = await (_db.select(_db.companies)..where((tbl) => tbl.id.equals(1))).getSingleOrNull();
+      if (company == null) {
+        await _db.into(_db.companies).insert(
+          const CompaniesCompanion(
+            id: Value(1),
+            name: Value('شركتي'),
+            defaultCurrency: Value('USD'),
+            invoicePrefix: Value('INV-'),
+            invoiceCounter: Value(0),
+          ),
+        );
+        company = await (_db.select(_db.companies)..where((tbl) => tbl.id.equals(1))).getSingle();
+      }
+
+      final newCounter = company.invoiceCounter + 1;
+      await (_db.update(_db.companies)..where((tbl) => tbl.id.equals(1))).write(
+        CompaniesCompanion(invoiceCounter: Value(newCounter)),
+      );
+
+      final counterStr = newCounter.toString().padLeft(4, '0');
+      final currentYear = DateTime.now().year;
+      final prefix = company.invoicePrefix;
+      return '$prefix$currentYear-$counterStr';
+    });
+  }
 }
 
 final invoiceRepositoryProvider = Provider<InvoiceRepository>(
