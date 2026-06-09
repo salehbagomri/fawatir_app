@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -78,11 +79,15 @@ class BackupService {
       return _currentUser;
     }
     try {
+      debugPrint("[GOOGLE SIGN IN] Attempting lightweight authentication...");
       final future = GoogleSignIn.instance.attemptLightweightAuthentication();
       final account = future != null ? await future : null;
+      debugPrint("[GOOGLE SIGN IN] Lightweight authentication returned: ${account?.email}");
       _currentUser = account;
       return account;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint("[GOOGLE SIGN IN] Error in getCurrentUser: $e");
+      debugPrint(stackTrace.toString());
       return null;
     }
   }
@@ -115,13 +120,20 @@ class BackupService {
 
   Future<bool> isSignedIn() async {
     final account = await getCurrentUser();
-    if (account == null) return false;
+    if (account == null) {
+      debugPrint("[GOOGLE SIGN IN] isSignedIn: account is null");
+      return false;
+    }
     try {
+      debugPrint("[GOOGLE SIGN IN] Checking authorization for scope: ${drive.DriveApi.driveAppdataScope}");
       final auth = await account.authorizationClient.authorizationForScopes([
         drive.DriveApi.driveAppdataScope,
       ]);
+      debugPrint("[GOOGLE SIGN IN] Authorization is: ${auth != null ? 'AUTHORIZED' : 'NOT AUTHORIZED'}");
       return auth != null;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint("[GOOGLE SIGN IN] Error in isSignedIn: $e");
+      debugPrint(stackTrace.toString());
       _currentUser = null;
       return false;
     }
