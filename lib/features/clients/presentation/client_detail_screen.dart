@@ -11,6 +11,8 @@ import 'package:fawatir/features/payments/data/payment_repository.dart';
 import 'package:fawatir/features/invoices/data/invoice_repository.dart';
 import 'package:fawatir/shared/pdf/receipt_pdf.dart';
 import 'package:fawatir/features/payments/application/receipt_pdf_service.dart';
+import 'package:fawatir/features/statements/data/statement_repository.dart';
+import 'package:fawatir/features/statements/application/statement_providers.dart';
 
 class ClientDetailScreen extends ConsumerWidget {
   final int clientId;
@@ -140,7 +142,7 @@ class ClientDetailScreen extends ConsumerWidget {
                       children: [
                         ClientInvoicesTab(clientId: client.id),
                         ClientPaymentsTab(clientId: client.id),
-                        _buildEmptyState('لا يوجد كشف حساب بعد', Icons.history),
+                        ClientStatementTab(clientId: client.id, accountCurrency: client.accountCurrency),
                       ],
                     ),
                   ),
@@ -254,29 +256,6 @@ class ClientDetailScreen extends ConsumerWidget {
             child: Text(
               value,
               style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(String message, IconData icon) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            size: 48,
-            color: AppColors.muted.withValues(alpha: 0.4),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: const TextStyle(
-              color: AppColors.muted,
-              fontSize: 16,
             ),
           ),
         ],
@@ -623,5 +602,354 @@ class ClientPaymentsTab extends ConsumerWidget {
         SnackBar(content: Text('خطأ أثناء معاينة السند: $e'), backgroundColor: Colors.red),
       );
     }
+  }
+}
+
+class ClientStatementTab extends StatefulWidget {
+  final int clientId;
+  final String accountCurrency;
+
+  const ClientStatementTab({
+    super.key,
+    required this.clientId,
+    required this.accountCurrency,
+  });
+
+  @override
+  State<ClientStatementTab> createState() => _ClientStatementTabState();
+}
+
+class _ClientStatementTabState extends State<ClientStatementTab> {
+  DateTime? _fromDate;
+  DateTime? _toDate;
+
+  String _formatDate(DateTime d) =>
+      '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
+
+  Future<void> _selectFromDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fromDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null) {
+      setState(() {
+        _fromDate = picked;
+      });
+    }
+  }
+
+  Future<void> _selectToDate(BuildContext context) async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _toDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null) {
+      setState(() {
+        _toDate = picked;
+      });
+    }
+  }
+
+  void _resetFilter() {
+    setState(() {
+      _fromDate = null;
+      _toDate = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Period Filter Section
+        Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: AppColors.line),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        side: const BorderSide(color: AppColors.line),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      icon: const Icon(Icons.calendar_today, size: 16, color: AppColors.muted),
+                      label: Text(
+                        _fromDate == null ? 'من تاريخ' : _formatDate(_fromDate!),
+                        style: const TextStyle(fontSize: 12, color: AppColors.dark),
+                      ),
+                      onPressed: () => _selectFromDate(context),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        side: const BorderSide(color: AppColors.line),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      icon: const Icon(Icons.calendar_today, size: 16, color: AppColors.muted),
+                      label: Text(
+                        _toDate == null ? 'إلى تاريخ' : _formatDate(_toDate!),
+                        style: const TextStyle(fontSize: 12, color: AppColors.dark),
+                      ),
+                      onPressed: () => _selectToDate(context),
+                    ),
+                  ),
+                  if (_fromDate != null || _toDate != null) ...[
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, color: Colors.red),
+                      tooltip: 'إعادة ضبط',
+                      onPressed: _resetFilter,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // Statement Content
+        Expanded(
+          child: Consumer(
+            builder: (context, ref, child) {
+              final statementAsync = ref.watch(statementProvider((
+                clientId: widget.clientId,
+                from: _fromDate,
+                to: _toDate,
+              )));
+
+              return statementAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (err, stack) => Center(child: Text('خطأ في تحميل كشف الحساب: $err')),
+                data: (statement) {
+                  if (statement.entries.isEmpty && statement.openingBalanceMinor == 0) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.history_toggle_off,
+                            size: 48,
+                            color: AppColors.muted.withValues(alpha: 0.4),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'لا توجد عمليات مسجلة في هذه الفترة',
+                            style: TextStyle(color: AppColors.muted, fontSize: 15),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Opening Balance Card
+                        Card(
+                          color: Colors.grey.shade50,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: const BorderSide(color: AppColors.line),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'الرصيد الافتتاحي:',
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.muted),
+                                ),
+                                Text(
+                                  formatMoney(statement.openingBalanceMinor, statement.accountCurrency),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.dark),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Ledger Table Card
+                        Card(
+                          elevation: 1,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: AppColors.line.withValues(alpha: 0.5)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Table(
+                              columnWidths: const {
+                                0: FlexColumnWidth(2.2), // Date
+                                1: FlexColumnWidth(3.0), // Ref
+                                2: FlexColumnWidth(2.0), // Debit (مدين)
+                                3: FlexColumnWidth(2.0), // Credit (دائن)
+                                4: FlexColumnWidth(2.5), // Running Balance
+                              },
+                              children: [
+                                // Table Header
+                                TableRow(
+                                  decoration: const BoxDecoration(
+                                    border: Border(bottom: BorderSide(color: AppColors.line, width: 1.5)),
+                                  ),
+                                  children: [
+                                    _buildHeaderCell('التاريخ'),
+                                    _buildHeaderCell('البيان'),
+                                    _buildHeaderCell('مدين', align: TextAlign.right),
+                                    _buildHeaderCell('دائن', align: TextAlign.right),
+                                    _buildHeaderCell('الرصيد', align: TextAlign.right),
+                                  ],
+                                ),
+                                // Table Body Rows
+                                ...statement.entries.map((entry) {
+                                  final isInvoice = entry.type == StatementEntryType.invoice;
+                                  final rowColor = isInvoice
+                                      ? Colors.blue.withValues(alpha: 0.03)
+                                      : Colors.green.withValues(alpha: 0.03);
+
+                                  return TableRow(
+                                    decoration: BoxDecoration(
+                                      color: rowColor,
+                                      border: const Border(bottom: BorderSide(color: AppColors.line, width: 0.5)),
+                                    ),
+                                    children: [
+                                      _buildBodyCell(_formatDate(entry.date), size: 11),
+                                      _buildBodyCell(entry.reference, size: 11, bold: true),
+                                      _buildBodyCell(
+                                        entry.debitMinor > 0
+                                            ? formatAmount(entry.debitMinor)
+                                            : '-',
+                                        align: TextAlign.right,
+                                        size: 11,
+                                        color: entry.debitMinor > 0 ? Colors.red.shade700 : null,
+                                      ),
+                                      _buildBodyCell(
+                                        entry.creditMinor > 0
+                                            ? formatAmount(entry.creditMinor)
+                                            : '-',
+                                        align: TextAlign.right,
+                                        size: 11,
+                                        color: entry.creditMinor > 0 ? Colors.green.shade700 : null,
+                                      ),
+                                      _buildBodyCell(
+                                        formatAmount(entry.runningBalanceMinor),
+                                        align: TextAlign.right,
+                                        size: 11,
+                                        bold: true,
+                                      ),
+                                    ],
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Totals Summary Card
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'إجمالي المدين: ${formatMoney(statement.totalDebitMinor, statement.accountCurrency)}',
+                                style: TextStyle(fontSize: 12, color: Colors.red.shade700, fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                'إجمالي الدائن: ${formatMoney(statement.totalCreditMinor, statement.accountCurrency)}',
+                                style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Closing Balance Card
+                        Card(
+                          color: AppColors.accent.withValues(alpha: 0.05),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: AppColors.accent.withValues(alpha: 0.15)),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'الرصيد الختامي:',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.accent),
+                                ),
+                                Text(
+                                  formatMoney(statement.closingBalanceMinor, statement.accountCurrency),
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.accent),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderCell(String text, {TextAlign align = TextAlign.start}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: AppColors.muted.withValues(alpha: 0.8),
+          fontSize: 12,
+        ),
+        textAlign: align,
+      ),
+    );
+  }
+
+  Widget _buildBodyCell(String text, {TextAlign align = TextAlign.start, double size = 12, bool bold = false, Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 4.0),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: size,
+          fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+          color: color ?? AppColors.dark,
+        ),
+        textAlign: align,
+      ),
+    );
   }
 }
