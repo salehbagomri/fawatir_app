@@ -12,7 +12,6 @@ import '../../../data/db/database.dart';
 
 /// معرّف عميل الويب (Web Client ID) الخاص بك من Google Cloud Console.
 /// مطلوب على نظام Android لتفعيل النسخ الاحتياطي السحابي عبر Google Drive.
-/// مثال: '1234567890-abcdefg.apps.googleusercontent.com'
 const String googleDriveServerClientId =
     '678878516062-mgng9f7acotlnk4hlvid42ol4p2iiklc.apps.googleusercontent.com';
 
@@ -29,47 +28,6 @@ class BackupService {
         serverClientId: googleDriveServerClientId,
       );
       _isInitialized = true;
-    }
-  }
-
-  Future<void> exportBackup() async {
-    try {
-      final tmpDir = await getTemporaryDirectory();
-      final tmp =
-          '${tmpDir.path}/fawatir_backup_${DateTime.now().millisecondsSinceEpoch}.sqlite';
-      await _db.customStatement("VACUUM INTO '$tmp'");
-
-      await Share.shareXFiles([
-        XFile(tmp),
-      ], text: 'نسخة احتياطية لقاعدة بيانات فواتير');
-    } catch (e) {
-      throw Exception('فشل تصدير النسخة الاحتياطية: $e');
-    }
-  }
-
-  Future<bool> importBackup() async {
-    try {
-      final result = await FilePicker.pickFiles(type: FileType.any);
-
-      if (result == null || result.files.single.path == null) {
-        return false;
-      }
-
-      final selectedPath = result.files.single.path!;
-      final selectedFile = File(selectedPath);
-
-      // Close database connection
-      await _db.close();
-
-      // Copy database file
-      final dbFile = await _db.databaseFile();
-      if (await dbFile.exists()) {
-        await dbFile.delete();
-      }
-      await selectedFile.copy(dbFile.path);
-      return true;
-    } catch (e) {
-      throw Exception('فشل استيراد النسخة الاحتياطية: $e');
     }
   }
 
@@ -163,6 +121,43 @@ class BackupService {
     }
   }
 
+  // ─── النسخ الاحتياطي المحلي ────────────────────────────────────────────────
+
+  Future<void> exportBackup() async {
+    try {
+      final tmpDir = await getTemporaryDirectory();
+      final tmp =
+          '${tmpDir.path}/fawatir_backup_${DateTime.now().millisecondsSinceEpoch}.sqlite';
+      await _db.customStatement("VACUUM INTO '$tmp'");
+      await Share.shareXFiles(
+        [XFile(tmp)],
+        text: 'نسخة احتياطية لقاعدة بيانات فواتير',
+      );
+    } catch (e) {
+      throw Exception('فشل تصدير النسخة الاحتياطية: $e');
+    }
+  }
+
+  Future<bool> importBackup() async {
+    try {
+      final result = await FilePicker.pickFiles(type: FileType.any);
+      if (result == null || result.files.single.path == null) return false;
+
+      final selectedFile = File(result.files.single.path!);
+      await _db.close();
+
+      final dbFile = await _db.databaseFile();
+      if (await dbFile.exists()) await dbFile.delete();
+      await selectedFile.copy(dbFile.path);
+
+      return true;
+    } catch (e) {
+      throw Exception('فشل استيراد النسخة الاحتياطية: $e');
+    }
+  }
+
+  // ─── النسخ الاحتياطي السحابي ───────────────────────────────────────────────
+
   Future<DateTime?> getLastBackupTime() async {
     try {
       final driveApi = await _getDriveApi();
@@ -219,8 +214,6 @@ class BackupService {
     }
   }
 
-  /// Phase 1: Download backup from Drive to a local temp file.
-  /// The database remains OPEN during this step — safe for UI updates.
   Future<String> downloadBackupToTemp() async {
     final driveApi = await _getDriveApi().timeout(const Duration(seconds: 30));
     if (driveApi == null) {
@@ -261,8 +254,6 @@ class BackupService {
     return tempFile.path;
   }
 
-  /// Phase 2: Apply the downloaded temp file as the new database.
-  /// Closes the DB, swaps files, and returns. Caller should call exit(0) after.
   Future<void> applyRestoredBackup(String tempFilePath) async {
     await _db.close();
 
