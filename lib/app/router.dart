@@ -11,6 +11,7 @@ import 'package:fawatir/features/subscriptions/presentation/subscriptions_screen
 import 'package:fawatir/features/subscriptions/presentation/subscription_form_screen.dart';
 import 'package:fawatir/features/invoices/presentation/invoice_form_screen.dart';
 import 'package:fawatir/features/invoices/presentation/invoice_detail_screen.dart';
+import 'package:fawatir/features/payments/presentation/payment_form_screen.dart';
 
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -111,6 +112,16 @@ final goRouter = GoRouter(
                     final id = int.tryParse(idStr ?? '') ?? 0;
                     return InvoiceDetailScreen(invoiceId: id);
                   },
+                  routes: [
+                    GoRoute(
+                      path: 'pay',
+                      builder: (context, state) {
+                        final idStr = state.pathParameters['id'];
+                        final id = int.tryParse(idStr ?? '') ?? 0;
+                        return PaymentFormScreen(invoiceId: id);
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),

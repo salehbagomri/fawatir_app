@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:fawatir/app/theme.dart';
 import 'package:fawatir/core/money.dart';
-import 'package:fawatir/data/db/database.dart';
 import 'package:fawatir/data/db/tables.dart';
 import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/invoices/application/invoice_providers.dart';
 import 'package:fawatir/features/invoices/data/invoice_repository.dart';
 import 'package:fawatir/features/invoices/application/invoice_pdf_service.dart';
+import 'package:fawatir/features/payments/application/payment_providers.dart';
+import 'package:fawatir/features/payments/application/receipt_pdf_service.dart';
 import 'package:fawatir/features/payments/data/payment_repository.dart';
 import 'package:fawatir/shared/pdf/invoice_pdf.dart';
+import 'package:fawatir/shared/pdf/receipt_pdf.dart';
 
 class InvoiceDetailScreen extends ConsumerWidget {
   final int invoiceId;
@@ -57,6 +60,10 @@ class InvoiceDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final invoiceAsync = ref.watch(invoiceByIdProvider(invoiceId));
     final itemsAsync = ref.watch(invoiceItemsProvider(invoiceId));
+    final remainingAsync = ref.watch(invoiceRemainingProvider(invoiceId));
+    final paymentsAsync = ref.watch(invoicePaymentsProvider(invoiceId));
+
+    final invoice = invoiceAsync.value;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -74,6 +81,60 @@ class InvoiceDetailScreen extends ConsumerWidget {
               tooltip: 'معاينة PDF',
               onPressed: () => _previewPdf(context, ref),
             ),
+            if (invoice != null)
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                tooltip: 'خيارات الفاتورة',
+                onSelected: (value) async {
+                  if (value == 'send') {
+                    await _changeInvoiceStatus(
+                      context,
+                      ref,
+                      invoice.id,
+                      invoice.clientId,
+                      InvoiceStatus.sent,
+                      'تم اعتماد الفاتورة وتحويلها إلى مرسلة',
+                    );
+                  } else if (value == 'cancel') {
+                    final confirmed = await _confirmCancelInvoice(context);
+                    if (confirmed == true && context.mounted) {
+                      await _changeInvoiceStatus(
+                        context,
+                        ref,
+                        invoice.id,
+                        invoice.clientId,
+                        InvoiceStatus.cancelled,
+                        'تم إلغاء الفاتورة بنجاح',
+                      );
+                    }
+                  }
+                },
+                itemBuilder: (context) => [
+                  if (invoice.status == InvoiceStatus.draft)
+                    const PopupMenuItem(
+                      value: 'send',
+                      child: Row(
+                        children: [
+                          Icon(Icons.send, color: Colors.blue, size: 18),
+                          SizedBox(width: 8),
+                          Text('اعتماد وإرسال الفاتورة'),
+                        ],
+                      ),
+                    ),
+                  if (invoice.status != InvoiceStatus.cancelled &&
+                      invoice.status != InvoiceStatus.paid)
+                    const PopupMenuItem(
+                      value: 'cancel',
+                      child: Row(
+                        children: [
+                          Icon(Icons.cancel_outlined, color: Colors.red, size: 18),
+                          SizedBox(width: 8),
+                          Text('إلغاء الفاتورة'),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
           ],
         ),
         body: invoiceAsync.when(
@@ -317,7 +378,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 20),
 
-                      // Grand Total Card
+                      // Grand Total & Remaining Card
                       Card(
                         color: AppColors.accent.withValues(alpha: 0.05),
                         shape: RoundedRectangleBorder(
@@ -325,17 +386,62 @@ class InvoiceDetailScreen extends ConsumerWidget {
                           side: BorderSide(color: AppColors.accent.withValues(alpha: 0.15)),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
                             children: [
-                              const Text(
-                                'إجمالي الفاتورة:',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.accent),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'إجمالي الفاتورة:',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.accent),
+                                  ),
+                                  Text(
+                                    formatMoney(invoice.totalMinor, invoice.currency),
+                                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.accent),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                formatMoney(invoice.totalMinor, invoice.currency),
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.accent),
+                              remainingAsync.maybeWhen(
+                                data: (remaining) {
+                                  if (remaining < invoice.totalMinor) {
+                                    final paid = invoice.totalMinor - remaining;
+                                    return Column(
+                                      children: [
+                                        const Divider(height: 16),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text(
+                                              'المسدد:',
+                                              style: TextStyle(fontSize: 14, color: Colors.green, fontWeight: FontWeight.bold),
+                                            ),
+                                            Text(
+                                              formatMoney(paid, invoice.currency),
+                                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text(
+                                              'المتبقي:',
+                                              style: TextStyle(fontSize: 14, color: Colors.red, fontWeight: FontWeight.bold),
+                                            ),
+                                            Text(
+                                              formatMoney(remaining, invoice.currency),
+                                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.red),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                                orElse: () => const SizedBox.shrink(),
                               ),
                             ],
                           ),
@@ -363,7 +469,85 @@ class InvoiceDetailScreen extends ConsumerWidget {
                             style: const TextStyle(fontSize: 14, color: AppColors.dark),
                           ),
                         ),
+                        const SizedBox(height: 20),
                       ],
+
+                      // Recorded Payments Section
+                      paymentsAsync.maybeWhen(
+                        data: (payments) {
+                          if (payments.isEmpty) return const SizedBox.shrink();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'التحصيلات المسجلة',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.accent),
+                              ),
+                              const SizedBox(height: 8),
+                              ...payments.map((p) {
+                                final pDate =
+                                    '${p.paymentDate.year}/${p.paymentDate.month.toString().padLeft(2, '0')}/${p.paymentDate.day.toString().padLeft(2, '0')}';
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  elevation: 0.5,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    side: BorderSide(
+                                        color: AppColors.line.withValues(alpha: 0.6)),
+                                  ),
+                                  child: ListTile(
+                                    dense: true,
+                                    leading: const CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor: Color(0xFFE8F5E9),
+                                      child: Icon(Icons.check,
+                                          color: Colors.green, size: 16),
+                                    ),
+                                    title: Text(
+                                      formatMoney(p.amountMinor, p.currency),
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14),
+                                    ),
+                                    subtitle: Text(
+                                      '${p.method ?? 'دفعة'} • $pDate',
+                                      style: const TextStyle(
+                                          fontSize: 12, color: AppColors.muted),
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (p.notes != null &&
+                                            p.notes!.trim().isNotEmpty)
+                                          Tooltip(
+                                            message: p.notes!,
+                                            child: const Padding(
+                                              padding: EdgeInsets.symmetric(
+                                                  horizontal: 4.0),
+                                              child: Icon(Icons.info_outline,
+                                                  size: 18,
+                                                  color: AppColors.muted),
+                                            ),
+                                          ),
+                                        IconButton(
+                                          icon: const Icon(Icons.receipt_long,
+                                              color: AppColors.accent,
+                                              size: 20),
+                                          tooltip: 'إصدار سند قبض',
+                                          onPressed: () => _shareReceipt(
+                                              context, ref, p.id),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
+                              const SizedBox(height: 12),
+                            ],
+                          );
+                        },
+                        orElse: () => const SizedBox.shrink(),
+                      ),
                       const SizedBox(height: 24),
                       // Actions Section
                       const Text(
@@ -420,25 +604,15 @@ class InvoiceDetailScreen extends ConsumerWidget {
                               ),
                             ),
                             icon: const Icon(Icons.verified),
-                            label: const Text('اعتماد الفاتورة', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                            onPressed: () async {
-                              final messenger = ScaffoldMessenger.of(context);
-                              try {
-                                await ref.read(invoiceRepositoryProvider).updateInvoiceStatus(invoice.id, InvoiceStatus.sent);
-                                ref.invalidate(invoiceByIdProvider(invoice.id));
-                                ref.invalidate(invoicesListProvider);
-                                messenger.showSnackBar(
-                                  const SnackBar(
-                                    content: Text('تم اعتماد الفاتورة وتحويلها إلى مرسلة'),
-                                    backgroundColor: Colors.green,
-                                  ),
-                                );
-                              } catch (e) {
-                                messenger.showSnackBar(
-                                  SnackBar(content: Text('خطأ أثناء اعتماد الفاتورة: $e'), backgroundColor: Colors.red),
-                                );
-                              }
-                            },
+                            label: const Text('اعتماد الفاتورة وإرسالها', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            onPressed: () => _changeInvoiceStatus(
+                              context,
+                              ref,
+                              invoice.id,
+                              invoice.clientId,
+                              InvoiceStatus.sent,
+                              'تم اعتماد الفاتورة وتحويلها إلى مرسلة',
+                            ),
                           ),
                         ),
                       ],
@@ -459,7 +633,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
                             ),
                             icon: const Icon(Icons.add_card),
                             label: const Text('تسجيل تحصيل', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                            onPressed: () => _showRecordPaymentBottomSheet(context, ref, invoice, client),
+                            onPressed: () => context.push('/invoices/${invoice.id}/pay'),
                           ),
                         ),
                       ],
@@ -548,328 +722,90 @@ class InvoiceDetailScreen extends ConsumerWidget {
     }
   }
 
-  void _showRecordPaymentBottomSheet(BuildContext context, WidgetRef ref, Invoice invoice, Client? client) async {
-    if (client == null) return;
-
-    final remainingMinor = await ref.read(paymentRepositoryProvider).invoiceRemainingMinor(invoice.id);
-    final remainingDecimal = remainingMinor / 100.0;
-
-    if (!context.mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return RecordPaymentSheet(
-          invoice: invoice,
-          client: client,
-          remainingDecimal: remainingDecimal,
-          ref: ref,
-        );
-      },
-    );
-  }
-}
-
-class RecordPaymentSheet extends StatefulWidget {
-  final Invoice invoice;
-  final Client client;
-  final double remainingDecimal;
-  final WidgetRef ref;
-
-  const RecordPaymentSheet({
-    super.key,
-    required this.invoice,
-    required this.client,
-    required this.remainingDecimal,
-    required this.ref,
-  });
-
-  @override
-  State<RecordPaymentSheet> createState() => _RecordPaymentSheetState();
-}
-
-class _RecordPaymentSheetState extends State<RecordPaymentSheet> {
-  final _formKey = GlobalKey<FormState>();
-  late TextEditingController _amountController;
-  late String _currency;
-  late DateTime _selectedDate;
-  late TextEditingController _dateController;
-  late String _method;
-  late TextEditingController _notesController;
-  late TextEditingController _fxRateController;
-
-  @override
-  void initState() {
-    super.initState();
-    _amountController = TextEditingController(
-      text: widget.remainingDecimal > 0 ? widget.remainingDecimal.toStringAsFixed(2) : '',
-    );
-    _currency = widget.invoice.currency;
-    _selectedDate = DateTime.now();
-    _dateController = TextEditingController(text: _formatDate(_selectedDate));
-    _method = 'تحويل بنكي';
-    _notesController = TextEditingController();
-
-    double initialFxRate = 1.0;
-    if (_currency == widget.invoice.currency) {
-      initialFxRate = widget.invoice.fxRateToAccount;
-    }
-    _fxRateController = TextEditingController(text: initialFxRate.toString());
-  }
-
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _dateController.dispose();
-    _notesController.dispose();
-    _fxRateController.dispose();
-    super.dispose();
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final showFxRate = _currency != widget.client.accountCurrency;
-
-    return Padding(
-      padding: EdgeInsets.only(
-        top: 20,
-        left: 16,
-        right: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'تسجيل تحصيل جديد',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.accent,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const Divider(),
-              const SizedBox(height: 12),
-
-              // Amount field
-              TextFormField(
-                controller: _amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'المبلغ',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.money),
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) {
-                    return 'الرجاء إدخال المبلغ';
-                  }
-                  final d = double.tryParse(val);
-                  if (d == null || d <= 0) {
-                    return 'الرجاء إدخال مبلغ صحيح أكبر من الصفر';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Currency Dropdown
-              DropdownButtonFormField<String>(
-                initialValue: _currency,
-                decoration: const InputDecoration(
-                  labelText: 'العملة',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'USD', child: Text('USD - دولار أمريكي')),
-                  DropdownMenuItem(value: 'YER', child: Text('YER - ريال يمني')),
-                  DropdownMenuItem(value: 'SAR', child: Text('SAR - ريال سعودي')),
-                ],
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() {
-                      _currency = val;
-                      if (_currency == widget.client.accountCurrency) {
-                        _fxRateController.text = '1.0';
-                      } else if (_currency == widget.invoice.currency) {
-                        _fxRateController.text = widget.invoice.fxRateToAccount.toString();
-                      } else {
-                        _fxRateController.text = '1.0';
-                      }
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Date field
-              TextFormField(
-                controller: _dateController,
-                readOnly: true,
-                decoration: const InputDecoration(
-                  labelText: 'تاريخ التحصيل',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.calendar_today),
-                ),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: _selectedDate,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2101),
-                  );
-                  if (picked != null) {
-                    setState(() {
-                      _selectedDate = picked;
-                      _dateController.text = _formatDate(picked);
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // FxRate Field (Visible only if currencies mismatch)
-              if (showFxRate) ...[
-                TextFormField(
-                  controller: _fxRateController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'سعر الصرف (1 $_currency = ؟ ${widget.client.accountCurrency})',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.currency_exchange),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
-                      return 'الرجاء إدخال سعر الصرف';
-                    }
-                    final d = double.tryParse(val);
-                    if (d == null || d <= 0) {
-                      return 'الرجاء إدخال سعر صرف صحيح';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-              ],
-
-              // Method Dropdown
-              DropdownButtonFormField<String>(
-                initialValue: _method,
-                decoration: const InputDecoration(
-                  labelText: 'طريقة الدفع',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'تحويل بنكي', child: Text('تحويل بنكي')),
-                  DropdownMenuItem(value: 'محفظة', child: Text('محفظة')),
-                  DropdownMenuItem(value: 'نقد', child: Text('نقد')),
-                  DropdownMenuItem(value: 'تحويل عبر الشبكة الموحدة', child: Text('تحويل عبر الشبكة الموحدة')),
-                  DropdownMenuItem(value: 'أخرى', child: Text('أخرى')),
-                ],
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() {
-                      _method = val;
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Notes
-              TextFormField(
-                controller: _notesController,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: 'ملاحظات (اختياري)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.note),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Submit button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  onPressed: _submit,
-                  child: const Text('حفظ التحصيل', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final amountMinor = parseToMinor(_amountController.text);
-    final fxRate = double.tryParse(_fxRateController.text) ?? 1.0;
-    final notes = _notesController.text.trim().isEmpty ? null : _notesController.text.trim();
-
-    final navigator = Navigator.of(context);
+  Future<void> _shareReceipt(BuildContext context, WidgetRef ref, int paymentId) async {
+    final nav = Navigator.of(context, rootNavigator: true);
     final messenger = ScaffoldMessenger.of(context);
 
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
     try {
-      await widget.ref.read(paymentRepositoryProvider).recordPayment(
-        clientId: widget.client.id,
-        invoiceId: widget.invoice.id,
-        amountMinor: amountMinor,
-        currency: _currency,
-        date: _selectedDate,
-        fxRateToAccount: fxRate,
-        method: _method,
-        notes: notes,
-      );
-
-      // Invalidate providers to refresh
-      widget.ref.invalidate(invoiceByIdProvider(widget.invoice.id));
-      widget.ref.invalidate(clientByIdProvider(widget.client.id));
-      widget.ref.invalidate(clientBalanceProvider(widget.client.id));
-      widget.ref.invalidate(clientPaymentsProvider(widget.client.id));
-      widget.ref.invalidate(invoicesListProvider);
-      widget.ref.invalidate(clientInvoicesProvider(widget.client.id));
-
-      navigator.pop();
+      final data = await ref.read(receiptPdfServiceProvider)(paymentId);
+      final bytes = await buildReceiptPdf(data);
+      nav.pop();
+      await shareReceiptPdf(bytes, data.receiptNumber);
+    } catch (e) {
+      nav.pop();
       messenger.showSnackBar(
-        const SnackBar(content: Text('تم تسجيل التحصيل بنجاح'), backgroundColor: Colors.green),
+        SnackBar(content: Text('خطأ أثناء مشاركة سند القبض: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _changeInvoiceStatus(
+    BuildContext context,
+    WidgetRef ref,
+    int id,
+    int clientId,
+    InvoiceStatus newStatus,
+    String successMessage,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(invoiceRepositoryProvider).updateInvoiceStatus(id, newStatus);
+      ref.invalidate(invoiceByIdProvider(id));
+      ref.invalidate(invoiceRemainingProvider(id));
+      ref.invalidate(invoicesListProvider);
+      ref.invalidate(clientInvoicesProvider(clientId));
+      ref.invalidate(clientBalanceProvider(clientId));
+      messenger.showSnackBar(
+        SnackBar(content: Text(successMessage), backgroundColor: Colors.green),
       );
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('خطأ أثناء حفظ التحصيل: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('خطأ أثناء تحديث حالة الفاتورة: $e'), backgroundColor: Colors.red),
       );
     }
+  }
+
+  Future<bool?> _confirmCancelInvoice(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.red),
+              SizedBox(width: 8),
+              Text('تأكيد إلغاء الفاتورة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+          content: const Text(
+            'هل أنت متأكد من رغبتك في إلغاء هذه الفاتورة؟ لن يتم احتسابها ضمن مديونية العميل بعد الإلغاء.',
+            style: TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('تراجع', style: TextStyle(color: AppColors.muted)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('نعم، إلغاء الفاتورة'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
