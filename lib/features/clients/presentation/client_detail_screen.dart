@@ -80,7 +80,47 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen> {
                     icon: const Icon(Icons.more_vert),
                     tooltip: 'خيارات إضافية',
                     onSelected: (val) async {
-                      if (val == 'toggle_active') {
+                      if (val == 'direct_pay') {
+                        context.push('/clients/${client.id}/pay');
+                      } else if (val == 'preview_statement') {
+                        final nav = Navigator.of(context, rootNavigator: true);
+                        final messenger = ScaffoldMessenger.of(context);
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (_) => const Center(child: CircularProgressIndicator()),
+                        );
+                        try {
+                          final data = await ref.read(statementPdfServiceProvider)(client.id);
+                          final bytes = await buildStatementPdf(data);
+                          nav.pop();
+                          await previewStatementPdf(bytes);
+                        } catch (e) {
+                          nav.pop();
+                          messenger.showSnackBar(
+                            SnackBar(content: Text('خطأ أثناء معاينة كشف الحساب: $e'), backgroundColor: Colors.red),
+                          );
+                        }
+                      } else if (val == 'share_statement') {
+                        final nav = Navigator.of(context, rootNavigator: true);
+                        final messenger = ScaffoldMessenger.of(context);
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (_) => const Center(child: CircularProgressIndicator()),
+                        );
+                        try {
+                          final data = await ref.read(statementPdfServiceProvider)(client.id);
+                          final bytes = await buildStatementPdf(data);
+                          nav.pop();
+                          await shareStatementPdf(bytes, data.clientName);
+                        } catch (e) {
+                          nav.pop();
+                          messenger.showSnackBar(
+                            SnackBar(content: Text('خطأ أثناء مشاركة كشف الحساب: $e'), backgroundColor: Colors.red),
+                          );
+                        }
+                      } else if (val == 'toggle_active') {
                         final willDeactivate = client.isActive;
                         if (willDeactivate) {
                           final balance = await ref.read(paymentRepositoryProvider).clientAccountBalanceMinor(client.id);
@@ -137,6 +177,37 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen> {
                       }
                     },
                     itemBuilder: (ctx) => [
+                      const PopupMenuItem(
+                        value: 'direct_pay',
+                        child: Row(
+                          children: [
+                            Icon(Icons.payment, color: Colors.green, size: 18),
+                            SizedBox(width: 8),
+                            Text('تسجيل تحصيل مباشر'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'preview_statement',
+                        child: Row(
+                          children: [
+                            Icon(Icons.picture_as_pdf, color: AppColors.accent, size: 18),
+                            SizedBox(width: 8),
+                            Text('معاينة كشف الحساب PDF'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'share_statement',
+                        child: Row(
+                          children: [
+                            Icon(Icons.share, color: Colors.blue, size: 18),
+                            SizedBox(width: 8),
+                            Text('مشاركة كشف الحساب PDF'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
                       PopupMenuItem(
                         value: 'toggle_active',
                         child: Row(
@@ -549,119 +620,156 @@ class ClientPaymentsTab extends ConsumerWidget {
       error: (err, stack) => Center(child: Text('خطأ في تحميل التحصيلات: $err')),
       data: (payments) {
         if (payments.isEmpty) {
-          return const EmptyState(
+          return EmptyState(
             icon: Icons.payments_outlined,
             title: 'لا توجد تحصيلات مسجلة بعد',
             subtitle: 'ستظهر هنا كافة الدفعات وسندات القبض المسددة لهذا العميل',
+            actionLabel: 'تسجيل تحصيل مباشر',
+            actionIcon: Icons.add,
+            onAction: () => context.push('/clients/$clientId/pay'),
           );
         }
 
-        return ListView.separated(
+        return ListView(
           padding: const EdgeInsets.all(16),
-          itemCount: payments.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final payment = payments[index];
-            final dateStr = '${payment.paymentDate.year}/${payment.paymentDate.month.toString().padLeft(2, '0')}/${payment.paymentDate.day.toString().padLeft(2, '0')}';
-
-            return Card(
-              elevation: 1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: AppColors.line.withValues(alpha: 0.5)),
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.accent,
+                  side: const BorderSide(color: AppColors.accent),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('تسجيل تحصيل مباشر لحساب العميل', style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: () => context.push('/clients/$clientId/pay'),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            ),
+            const SizedBox(height: 12),
+            ...payments.map((payment) {
+              final dateStr = '${payment.paymentDate.year}/${payment.paymentDate.month.toString().padLeft(2, '0')}/${payment.paymentDate.day.toString().padLeft(2, '0')}';
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: AppColors.line.withValues(alpha: 0.5)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                formatMoney(payment.amountMinor, payment.currency),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Colors.green,
-                                ),
-                              ),
-                              Text(
-                                dateStr,
-                                style: const TextStyle(
-                                  color: AppColors.muted,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.payment, size: 16, color: AppColors.muted),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        payment.method ?? 'طريقة دفع غير محددة',
-                                        style: const TextStyle(fontSize: 13, color: AppColors.dark),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                      ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    formatMoney(payment.amountMinor, payment.currency),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: Colors.green,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  Text(
+                                    dateStr,
+                                    style: const TextStyle(
+                                      color: AppColors.muted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 12),
-                              if (payment.invoiceId != null)
-                                FutureBuilder<Invoice?>(
-                                  future: ref.read(invoiceRepositoryProvider).getInvoice(payment.invoiceId!),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.hasData && snapshot.data != null) {
-                                      return Text(
-                                        'فاتورة: ${snapshot.data!.number}',
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          color: AppColors.accent,
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.payment, size: 16, color: AppColors.muted),
+                                        const SizedBox(width: 6),
+                                        Expanded(
+                                          child: Text(
+                                            payment.method ?? 'طريقة دفع غير محددة',
+                                            style: const TextStyle(fontSize: 13, color: AppColors.dark),
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  if (payment.invoiceId != null)
+                                    FutureBuilder<Invoice?>(
+                                      future: ref.read(invoiceRepositoryProvider).getInvoice(payment.invoiceId!),
+                                      builder: (context, snapshot) {
+                                        if (snapshot.hasData && snapshot.data != null) {
+                                          return Text(
+                                            'فاتورة: ${snapshot.data!.number}',
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: AppColors.accent,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          );
+                                        }
+                                        return const SizedBox.shrink();
+                                      },
+                                    )
+                                  else
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.shade50,
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: Colors.blue.shade200),
+                                      ),
+                                      child: Text(
+                                        'تحصيل مباشر',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.blue.shade800,
                                           fontWeight: FontWeight.bold,
                                         ),
-                                      );
-                                    }
-                                    return const SizedBox.shrink();
-                                  },
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (payment.notes != null && payment.notes!.isNotEmpty) ...[
+                                const Divider(height: 16),
+                                Text(
+                                  payment.notes!,
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
                                 ),
+                              ],
                             ],
                           ),
-                          if (payment.notes != null && payment.notes!.isNotEmpty) ...[
-                            const Divider(height: 16),
-                            Text(
-                              payment.notes!,
-                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
-                            ),
-                          ],
-                        ],
-                      ),
+                        ),
+                        const SizedBox(width: 12),
+                        GestureDetector(
+                          onLongPress: () => _previewReceipt(context, ref, payment),
+                          child: IconButton(
+                            icon: const Icon(Icons.receipt_long, color: AppColors.accent),
+                            tooltip: 'سند قبض (مشاركة، نقرة مطولة للمعاينة)',
+                            onPressed: () => _shareReceipt(context, ref, payment),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    GestureDetector(
-                      onLongPress: () => _previewReceipt(context, ref, payment),
-                      child: IconButton(
-                        icon: const Icon(Icons.receipt_long, color: AppColors.accent),
-                        tooltip: 'سند قبض (مشاركة، نقرة مطولة للمعاينة)',
-                        onPressed: () => _shareReceipt(context, ref, payment),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            }),
+          ],
         );
       },
     );

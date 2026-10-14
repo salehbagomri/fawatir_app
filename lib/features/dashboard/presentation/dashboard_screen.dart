@@ -11,6 +11,7 @@ import 'package:fawatir/shared/widgets/confirm_dialog.dart';
 import 'package:fawatir/shared/widgets/app_snackbar.dart';
 import 'package:fawatir/features/payments/data/payment_repository.dart';
 import '../data/dashboard_repository.dart';
+import 'widgets/global_search_delegate.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -132,6 +133,18 @@ class _DashboardBody extends ConsumerWidget {
         SliverAppBar(
           expandedHeight: 140,
           pinned: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.search_rounded, color: Colors.white),
+              tooltip: 'بحث شامل',
+              onPressed: () {
+                showSearch(
+                  context: context,
+                  delegate: AppGlobalSearchDelegate(ref: ref),
+                );
+              },
+            ),
+          ],
           flexibleSpace: FlexibleSpaceBar(
             titlePadding: const EdgeInsetsDirectional.only(
                 start: 20, bottom: 16),

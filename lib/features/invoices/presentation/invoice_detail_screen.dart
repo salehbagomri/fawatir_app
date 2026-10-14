@@ -155,9 +155,21 @@ class InvoiceDetailScreen extends ConsumerWidget {
                         'تم إلغاء الفاتورة بنجاح',
                       );
                     }
+                  } else if (value == 'duplicate') {
+                    context.push('/invoices/new', extra: invoice.id);
                   }
                 },
                 itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'duplicate',
+                    child: Row(
+                      children: [
+                        Icon(Icons.copy_rounded, color: AppColors.accent, size: 18),
+                        SizedBox(width: 8),
+                        Text('نسخ الفاتورة (فاتورة جديدة)'),
+                      ],
+                    ),
+                  ),
                   if (invoice.status == InvoiceStatus.draft) ...[
                     const PopupMenuItem(
                       value: 'edit',

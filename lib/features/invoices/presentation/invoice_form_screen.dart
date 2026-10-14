@@ -28,10 +28,12 @@ class InvoiceItemRow {
 
 class InvoiceFormScreen extends ConsumerStatefulWidget {
   final int? invoiceId;
+  final int? duplicateFromInvoiceId;
 
   const InvoiceFormScreen({
     super.key,
     this.invoiceId,
+    this.duplicateFromInvoiceId,
   });
 
   @override
@@ -55,12 +57,12 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.invoiceId == null) {
+    if (widget.invoiceId == null && widget.duplicateFromInvoiceId == null) {
       _addItemRow(); // Start with one item row by default for new invoices
     }
   }
 
-  void _initFromInvoice(Invoice invoice, List<InvoiceItem> items, List<Client> clients) {
+  void _initFromInvoice(Invoice invoice, List<InvoiceItem> items, List<Client> clients, {bool isDuplicating = false}) {
     if (_isInitialized) return;
 
     try {
@@ -70,8 +72,14 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     }
 
     _invoiceCurrency = invoice.currency;
-    _issueDate = invoice.issueDate;
-    _dueDate = invoice.dueDate;
+    _issueDate = isDuplicating ? DateTime.now() : invoice.issueDate;
+    if (isDuplicating) {
+      _dueDate = invoice.dueDate != null
+          ? DateTime.now().add(invoice.dueDate!.difference(invoice.issueDate))
+          : null;
+    } else {
+      _dueDate = invoice.dueDate;
+    }
     _fxRateController.text = invoice.fxRateToAccount.toString();
     _notesController.text = invoice.notes ?? '';
 
@@ -332,6 +340,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   Widget build(BuildContext context) {
     final activeClientsAsync = ref.watch(activeClientsProvider);
     final isEditing = widget.invoiceId != null;
+    final isDuplicating = widget.duplicateFromInvoiceId != null;
 
     if (isEditing) {
       final invoiceAsync = ref.watch(invoiceByIdProvider(widget.invoiceId!));
@@ -398,6 +407,25 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       if (!_isInitialized && activeClientsAsync.hasValue && items != null) {
         _initFromInvoice(invoice, items, activeClientsAsync.value!);
       }
+    } else if (isDuplicating) {
+      final duplicateAsync = ref.watch(invoiceByIdProvider(widget.duplicateFromInvoiceId!));
+      final duplicateItemsAsync = ref.watch(invoiceItemsProvider(widget.duplicateFromInvoiceId!));
+
+      if (duplicateAsync.isLoading || duplicateItemsAsync.isLoading) {
+        return const Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          ),
+        );
+      }
+
+      final dupInvoice = duplicateAsync.value;
+      final dupItems = duplicateItemsAsync.value;
+
+      if (!_isInitialized && activeClientsAsync.hasValue && dupInvoice != null && dupItems != null) {
+        _initFromInvoice(dupInvoice, dupItems, activeClientsAsync.value!, isDuplicating: true);
+      }
     }
 
     final showFxRate = _selectedClient != null && _invoiceCurrency != _selectedClient!.accountCurrency;
@@ -406,7 +434,9 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(isEditing ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'),
+          title: Text(isEditing
+              ? 'تعديل الفاتورة'
+              : (isDuplicating ? 'نسخ الفاتورة (مسودة جديدة)' : 'إنشاء فاتورة جديدة')),
           actions: [
             _isSaving
                 ? const Padding(

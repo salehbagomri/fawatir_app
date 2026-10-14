@@ -96,6 +96,14 @@ final goRouter = GoRouter(
                         ),
                       ],
                     ),
+                    GoRoute(
+                      path: 'pay',
+                      builder: (context, state) {
+                        final idStr = state.pathParameters['id'];
+                        final id = int.tryParse(idStr ?? '') ?? 0;
+                        return PaymentFormScreen(clientId: id);
+                      },
+                    ),
                   ],
                 ),
               ],
@@ -111,7 +119,10 @@ final goRouter = GoRouter(
               routes: [
                 GoRoute(
                   path: 'new',
-                  builder: (context, state) => const InvoiceFormScreen(),
+                  builder: (context, state) {
+                    final duplicateFrom = state.extra as int?;
+                    return InvoiceFormScreen(duplicateFromInvoiceId: duplicateFrom);
+                  },
                 ),
                 GoRoute(
                   path: 'drafts-review',
