@@ -33,6 +33,12 @@ class SubscriptionRepository {
   Future<Subscription?> getSubscription(int id) {
     return (_db.select(_db.subscriptions)..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
   }
+
+  Future<bool> deleteSubscription(int id) {
+    return (_db.delete(_db.subscriptions)..where((tbl) => tbl.id.equals(id)))
+        .go()
+        .then((count) => count > 0);
+  }
 }
 
 final subscriptionRepositoryProvider = Provider<SubscriptionRepository>(

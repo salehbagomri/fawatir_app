@@ -86,7 +86,9 @@ class InvoiceDetailScreen extends ConsumerWidget {
                 icon: const Icon(Icons.more_vert),
                 tooltip: 'خيارات الفاتورة',
                 onSelected: (value) async {
-                  if (value == 'send') {
+                  if (value == 'edit') {
+                    context.push('/invoices/${invoice.id}/edit');
+                  } else if (value == 'send') {
                     await _changeInvoiceStatus(
                       context,
                       ref,
@@ -110,7 +112,17 @@ class InvoiceDetailScreen extends ConsumerWidget {
                   }
                 },
                 itemBuilder: (context) => [
-                  if (invoice.status == InvoiceStatus.draft)
+                  if (invoice.status == InvoiceStatus.draft) ...[
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, color: AppColors.accent, size: 18),
+                          SizedBox(width: 8),
+                          Text('تعديل الفاتورة'),
+                        ],
+                      ),
+                    ),
                     const PopupMenuItem(
                       value: 'send',
                       child: Row(
@@ -121,6 +133,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
+                  ],
                   if (invoice.status != InvoiceStatus.cancelled &&
                       invoice.status != InvoiceStatus.paid)
                     const PopupMenuItem(
@@ -592,28 +605,47 @@ class InvoiceDetailScreen extends ConsumerWidget {
                       ),
                       if (invoice.status == InvoiceStatus.draft) ...[
                         const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blue.shade700,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.accent,
+                                  side: const BorderSide(color: AppColors.accent),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.edit_note),
+                                label: const Text('تعديل الفاتورة', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                onPressed: () => context.push('/invoices/${invoice.id}/edit'),
                               ),
                             ),
-                            icon: const Icon(Icons.verified),
-                            label: const Text('اعتماد الفاتورة وإرسالها', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                            onPressed: () => _changeInvoiceStatus(
-                              context,
-                              ref,
-                              invoice.id,
-                              invoice.clientId,
-                              InvoiceStatus.sent,
-                              'تم اعتماد الفاتورة وتحويلها إلى مرسلة',
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue.shade700,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.verified),
+                                label: const Text('اعتماد وإرسال', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                onPressed: () => _changeInvoiceStatus(
+                                  context,
+                                  ref,
+                                  invoice.id,
+                                  invoice.clientId,
+                                  InvoiceStatus.sent,
+                                  'تم اعتماد الفاتورة وتحويلها إلى مرسلة',
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                       if (invoice.status != InvoiceStatus.draft &&

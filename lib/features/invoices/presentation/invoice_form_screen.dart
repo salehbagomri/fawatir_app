@@ -8,6 +8,9 @@ import 'package:fawatir/data/db/tables.dart';
 import 'package:fawatir/features/invoices/application/invoice_providers.dart';
 import 'package:fawatir/features/invoices/data/invoice_repository.dart';
 
+import 'package:fawatir/features/clients/application/client_providers.dart';
+import 'package:fawatir/features/payments/application/payment_providers.dart';
+
 class InvoiceItemRow {
   final descriptionController = TextEditingController();
   final qtyController = TextEditingController(text: '1');
@@ -23,7 +26,12 @@ class InvoiceItemRow {
 }
 
 class InvoiceFormScreen extends ConsumerStatefulWidget {
-  const InvoiceFormScreen({super.key});
+  final int? invoiceId;
+
+  const InvoiceFormScreen({
+    super.key,
+    this.invoiceId,
+  });
 
   @override
   ConsumerState<InvoiceFormScreen> createState() => _InvoiceFormScreenState();
@@ -41,11 +49,51 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
 
   final List<InvoiceItemRow> _itemRows = [];
   bool _isSaving = false;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _addItemRow(); // Start with one item row by default
+    if (widget.invoiceId == null) {
+      _addItemRow(); // Start with one item row by default for new invoices
+    }
+  }
+
+  void _initFromInvoice(Invoice invoice, List<InvoiceItem> items, List<Client> clients) {
+    if (_isInitialized) return;
+
+    try {
+      _selectedClient = clients.firstWhere((c) => c.id == invoice.clientId);
+    } catch (_) {
+      _selectedClient = null;
+    }
+
+    _invoiceCurrency = invoice.currency;
+    _issueDate = invoice.issueDate;
+    _dueDate = invoice.dueDate;
+    _fxRateController.text = invoice.fxRateToAccount.toString();
+    _notesController.text = invoice.notes ?? '';
+
+    for (final r in _itemRows) {
+      r.dispose();
+    }
+    _itemRows.clear();
+
+    if (items.isNotEmpty) {
+      for (final item in items) {
+        final row = InvoiceItemRow();
+        row.descriptionController.text = item.description;
+        row.qtyController.text = item.quantity.toString();
+        row.priceController.text = (item.unitPriceMinor / 100.0).toStringAsFixed(2);
+        row.qtyController.addListener(_onItemChanged);
+        row.priceController.addListener(_onItemChanged);
+        _itemRows.add(row);
+      }
+    } else {
+      _addItemRow();
+    }
+
+    _isInitialized = true;
   }
 
   @override
@@ -137,31 +185,62 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       return;
     }
 
+    if (_dueDate != null) {
+      final issueOnly = DateTime(_issueDate.year, _issueDate.month, _issueDate.day);
+      final dueOnly = DateTime(_dueDate!.year, _dueDate!.month, _dueDate!.day);
+      if (dueOnly.isBefore(issueOnly)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تاريخ الاستحقاق يجب أن يكون بعد أو نفس تاريخ الإصدار'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
+    for (int i = 0; i < _itemRows.length; i++) {
+      final row = _itemRows[i];
+      final desc = row.descriptionController.text.trim();
+      final qty = double.tryParse(row.qtyController.text.trim()) ?? 0.0;
+      final price = parseToMinor(row.priceController.text.trim());
+      if (desc.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('يرجى إدخال وصف البند رقم ${i + 1}'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+      if (qty <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('الكمية في البند رقم ${i + 1} يجب أن تكون أكبر من الصفر'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+      if (price <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('سعر الوحدة في البند رقم ${i + 1} يجب أن يكون أكبر من الصفر'), backgroundColor: Colors.red),
+        );
+        return;
+      }
+    }
+
+    final showFxRate = _selectedClient != null && _invoiceCurrency != _selectedClient!.accountCurrency;
+    final fxRate = showFxRate ? (double.tryParse(_fxRateController.text.trim()) ?? 1.0) : 1.0;
+    if (showFxRate && fxRate <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('سعر الصرف يجب أن يكون أكبر من الصفر'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     setState(() {
       _isSaving = true;
     });
 
+    final isEditing = widget.invoiceId != null;
+
     try {
       final repo = ref.read(invoiceRepositoryProvider);
-      
-      // 1. Generate unique invoice number atomic transaction
-      final number = await repo.nextInvoiceNumber();
-
-      // 2. Determine exchange rate
-      final showFxRate = _selectedClient != null && _invoiceCurrency != _selectedClient!.accountCurrency;
-      final fxRate = showFxRate ? (double.tryParse(_fxRateController.text.trim()) ?? 1.0) : 1.0;
-
-      // 3. Create Companions
-      final invoice = InvoicesCompanion.insert(
-        number: number,
-        clientId: _selectedClient!.id,
-        issueDate: _issueDate,
-        dueDate: Value(_dueDate),
-        status: const Value(InvoiceStatus.sent),
-        currency: _invoiceCurrency,
-        fxRateToAccount: Value(fxRate),
-        notes: Value(_notesController.text.trim().isEmpty ? null : _notesController.text.trim()),
-      );
 
       final items = _itemRows.map((row) {
         final desc = row.descriptionController.text.trim();
@@ -169,25 +248,81 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         final price = parseToMinor(row.priceController.text.trim());
 
         return InvoiceItemsCompanion(
-          invoiceId: const Value.absent(), // Assigned in transaction
+          invoiceId: isEditing ? Value(widget.invoiceId!) : const Value.absent(),
           description: Value(desc),
           quantity: Value(qty),
           unitPriceMinor: Value(price),
-          lineTotalMinor: const Value(0), // Assigned in transaction
+          lineTotalMinor: const Value(0),
         );
       }).toList();
 
-      // 4. Save Invoice & Items in an atomic transaction
-      await repo.createInvoiceWithItems(invoice, items);
+      if (isEditing) {
+        final existingInvoice = ref.read(invoiceByIdProvider(widget.invoiceId!)).value;
+        final number = existingInvoice?.number ?? '';
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('تم إنشاء الفاتورة رقم $number بنجاح'),
-            backgroundColor: AppColors.accent,
-          ),
+        final invoiceCompanion = InvoicesCompanion(
+          id: Value(widget.invoiceId!),
+          number: Value(number),
+          clientId: Value(_selectedClient!.id),
+          issueDate: Value(_issueDate),
+          dueDate: Value(_dueDate),
+          status: const Value(InvoiceStatus.draft),
+          currency: Value(_invoiceCurrency),
+          fxRateToAccount: Value(fxRate),
+          notes: Value(_notesController.text.trim().isEmpty ? null : _notesController.text.trim()),
         );
-        Navigator.of(context).pop();
+
+        await repo.updateInvoiceWithItems(widget.invoiceId!, invoiceCompanion, items);
+
+        ref.invalidate(invoiceByIdProvider(widget.invoiceId!));
+        ref.invalidate(invoiceItemsProvider(widget.invoiceId!));
+        ref.invalidate(invoiceRemainingProvider(widget.invoiceId!));
+        ref.invalidate(invoicesListProvider);
+        if (_selectedClient != null) {
+          ref.invalidate(clientInvoicesProvider(_selectedClient!.id));
+          ref.invalidate(clientBalanceProvider(_selectedClient!.id));
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم تعديل الفاتورة رقم $number بنجاح'),
+              backgroundColor: AppColors.accent,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
+      } else {
+        final number = await repo.nextInvoiceNumber();
+
+        final invoice = InvoicesCompanion.insert(
+          number: number,
+          clientId: _selectedClient!.id,
+          issueDate: _issueDate,
+          dueDate: Value(_dueDate),
+          status: const Value(InvoiceStatus.sent),
+          currency: _invoiceCurrency,
+          fxRateToAccount: Value(fxRate),
+          notes: Value(_notesController.text.trim().isEmpty ? null : _notesController.text.trim()),
+        );
+
+        await repo.createInvoiceWithItems(invoice, items);
+
+        ref.invalidate(invoicesListProvider);
+        if (_selectedClient != null) {
+          ref.invalidate(clientInvoicesProvider(_selectedClient!.id));
+          ref.invalidate(clientBalanceProvider(_selectedClient!.id));
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('تم إنشاء الفاتورة رقم $number بنجاح'),
+              backgroundColor: AppColors.accent,
+            ),
+          );
+          Navigator.of(context).pop();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -207,13 +342,82 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   @override
   Widget build(BuildContext context) {
     final activeClientsAsync = ref.watch(activeClientsProvider);
+    final isEditing = widget.invoiceId != null;
+
+    if (isEditing) {
+      final invoiceAsync = ref.watch(invoiceByIdProvider(widget.invoiceId!));
+      final itemsAsync = ref.watch(invoiceItemsProvider(widget.invoiceId!));
+
+      if (invoiceAsync.isLoading || itemsAsync.isLoading) {
+        return const Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          ),
+        );
+      }
+
+      final invoice = invoiceAsync.value;
+      final items = itemsAsync.value;
+
+      if (invoice == null) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            appBar: AppBar(title: const Text('تعديل الفاتورة')),
+            body: const Center(child: Text('الفاتورة غير موجودة')),
+          ),
+        );
+      }
+
+      if (invoice.status != InvoiceStatus.draft) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Scaffold(
+            appBar: AppBar(title: Text('الفاتورة ${invoice.number}')),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.lock_outline, size: 64, color: Colors.orange),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'لا يمكن تعديل هذه الفاتورة',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'التعديل متاح فقط للفواتير التي لا تزال في حالة مسودة.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.muted),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('العودة'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      if (!_isInitialized && activeClientsAsync.hasValue && items != null) {
+        _initFromInvoice(invoice, items, activeClientsAsync.value!);
+      }
+    }
+
     final showFxRate = _selectedClient != null && _invoiceCurrency != _selectedClient!.accountCurrency;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('إنشاء فاتورة جديدة'),
+          title: Text(isEditing ? 'تعديل الفاتورة' : 'إنشاء فاتورة جديدة'),
           actions: [
             _isSaving
                 ? const Padding(
@@ -254,8 +458,17 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                         loading: () => const Center(child: CircularProgressIndicator()),
                         error: (err, stack) => Text('خطأ في تحميل العملاء: $err', style: const TextStyle(color: Colors.red)),
                         data: (clients) {
+                          Client? currentClient;
+                          if (_selectedClient != null) {
+                            try {
+                              currentClient = clients.firstWhere((c) => c.id == _selectedClient!.id);
+                            } catch (_) {
+                              currentClient = null;
+                            }
+                          }
+
                           return DropdownButtonFormField<Client>(
-                            initialValue: _selectedClient,
+                            initialValue: currentClient,
                             decoration: const InputDecoration(
                               labelText: 'اختر العميل *',
                               border: OutlineInputBorder(),
@@ -267,15 +480,17 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                                 child: Text('${client.name} (${client.accountCurrency})'),
                               );
                             }).toList(),
-                            onChanged: (client) {
-                              if (client != null) {
-                                setState(() {
-                                  _selectedClient = client;
-                                  _invoiceCurrency = client.accountCurrency;
-                                  _fxRateController.text = '1.0';
-                                });
-                              }
-                            },
+                            onChanged: isEditing
+                                ? null
+                                : (client) {
+                                    if (client != null) {
+                                      setState(() {
+                                        _selectedClient = client;
+                                        _invoiceCurrency = client.accountCurrency;
+                                        _fxRateController.text = '1.0';
+                                      });
+                                    }
+                                  },
                             validator: (val) => val == null ? 'يرجى اختيار العميل' : null,
                           );
                         },
@@ -523,8 +738,8 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                                       return 'يرجى إدخال السعر';
                                     }
                                     final d = double.tryParse(val.trim());
-                                    if (d == null || d < 0) {
-                                      return 'قيمة غير سالبة';
+                                    if (d == null || d <= 0) {
+                                      return 'أكبر من 0';
                                     }
                                     return null;
                                   },

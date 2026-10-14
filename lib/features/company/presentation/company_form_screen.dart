@@ -255,6 +255,14 @@ class _CompanyFormScreenState extends ConsumerState<CompanyFormScreen> {
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.email),
                           ),
+                          validator: (val) {
+                            if (val != null && val.trim().isNotEmpty) {
+                              if (!val.contains('@') || !val.contains('.')) {
+                                return 'صيغة بريد إلكتروني غير صحيحة';
+                              }
+                            }
+                            return null;
+                          },
                         ),
                       ),
                     ],
@@ -328,8 +336,9 @@ class _CompanyFormScreenState extends ConsumerState<CompanyFormScreen> {
                             if (val == null || val.trim().isEmpty) {
                               return 'يرجى إدخال رقم العداد';
                             }
-                            if (int.tryParse(val) == null) {
-                              return 'يجب إدخال رقم صحيح';
+                            final n = int.tryParse(val.trim());
+                            if (n == null || n < 0) {
+                              return 'يجب إدخال رقم صحيح غير سالب';
                             }
                             return null;
                           },

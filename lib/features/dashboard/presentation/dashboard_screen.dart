@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fawatir/app/theme.dart';
 import 'package:fawatir/core/money.dart';
+import 'package:go_router/go_router.dart';
+import 'package:fawatir/features/company/application/company_providers.dart';
 import '../data/dashboard_repository.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -24,12 +26,24 @@ class DashboardScreen extends ConsumerWidget {
   }
 }
 
-class _DashboardBody extends StatelessWidget {
+class _DashboardBody extends ConsumerWidget {
   final DashboardStats stats;
   const _DashboardBody({required this.stats});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final companyAsync = ref.watch(companyStreamProvider);
+    final isCompanyIncomplete = companyAsync.when(
+      data: (company) =>
+          company == null ||
+          company.name.trim().isEmpty ||
+          (company.name == 'شركتي' &&
+              (company.phone == null || company.phone!.isEmpty) &&
+              (company.address == null || company.address!.isEmpty)),
+      loading: () => false,
+      error: (err, stack) => false,
+    );
+
     return CustomScrollView(
       slivers: [
         // ── App Bar مخصّص ──
@@ -108,6 +122,9 @@ class _DashboardBody extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
+              // ── بانر إعداد بيانات الشركة لأول تشغيل ──
+              if (isCompanyIncomplete) _buildCompanyOnboardingBanner(context),
+
               // ── صف البطاقات الرئيسية ──
               _buildMainCards(context),
               const SizedBox(height: 20),
@@ -122,6 +139,88 @@ class _DashboardBody extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCompanyOnboardingBanner(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF1F3A5F),
+            Color(0xFF2D5F8B),
+          ],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1F3A5F).withValues(alpha: 0.15),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.storefront_outlined, color: Colors.white, size: 26),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'أكمل إعداد بيانات شركتك',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'أضف اسم منشأتك، الشعار، ومعلومات الاتصال لتظهر تلقائياً في ترويسة الفواتير وسندات القبض.',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.88),
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF1F3A5F),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    visualDensity: VisualDensity.compact,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  icon: const Icon(Icons.arrow_back, size: 16),
+                  label: const Text(
+                    'إعداد بيانات الشركة',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  onPressed: () {
+                    context.go('/settings/company-setup');
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

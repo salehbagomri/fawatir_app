@@ -7,11 +7,23 @@ import 'package:fawatir/data/db/tables.dart';
 import 'package:fawatir/features/invoices/application/invoice_providers.dart';
 import 'package:fawatir/features/invoices/data/invoice_repository.dart';
 import 'package:fawatir/features/payments/data/payment_repository.dart';
+import 'package:fawatir/shared/widgets/empty_state.dart';
+import 'package:fawatir/shared/widgets/confirm_dialog.dart';
 
 class InvoicesScreen extends ConsumerWidget {
   const InvoicesScreen({super.key});
 
   Future<void> _generateInvoices(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'توليد فواتير الشهر',
+      message: 'هل تريد فحص كافة الاشتراكات وتوليد فواتير مسودة جديدة للاشتراكات المستحقة لهذا الشهر؟ لن يتم تكرار أي فواتير تم توليدها مسبقاً لنفس الشهر.',
+      confirmLabel: 'بدء التوليد',
+      cancelLabel: 'إلغاء',
+      icon: Icons.autorenew,
+    );
+    if (confirmed != true || !context.mounted) return;
+
     final nav = Navigator.of(context, rootNavigator: true);
     final messenger = ScaffoldMessenger.of(context);
 
@@ -29,18 +41,15 @@ class InvoicesScreen extends ConsumerWidget {
       if (createdIds.isEmpty) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('لا فواتير جديدة لهذا الشهر'),
+            content: Text('لا توجد اشتراكات مستحقة لتوليد فواتير جديدة لها هذا الشهر'),
             backgroundColor: AppColors.accent,
           ),
         );
       } else {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('تم توليد ${createdIds.length} فاتورة كمسودة'),
-            backgroundColor: Colors.green.shade700,
-          ),
-        );
         ref.read(invoiceStatusFilterProvider.notifier).setFilter(InvoiceStatus.draft);
+        if (context.mounted) {
+          context.push('/invoices/drafts-review', extra: createdIds);
+        }
       }
     } catch (e) {
       nav.pop();
@@ -146,11 +155,27 @@ class InvoicesScreen extends ConsumerWidget {
                 ),
                 data: (invoices) {
                   if (invoices.isEmpty) {
-                    return const Center(
-                      child: Text(
-                        'لا توجد فواتير بعد',
-                        style: TextStyle(fontSize: 18, color: AppColors.muted),
-                      ),
+                    if (currentFilter != null) {
+                      return EmptyState(
+                        icon: Icons.filter_alt_off_rounded,
+                        title: 'لا توجد فواتير بحالة "${_getStatusLabel(currentFilter)}"',
+                        subtitle: 'لم يتم العثور على فواتير مطابقة لهذا التصنيف',
+                        actionLabel: 'عرض كل الفواتير',
+                        actionIcon: Icons.list_alt,
+                        onAction: () {
+                          ref.read(invoiceStatusFilterProvider.notifier).setFilter(null);
+                        },
+                      );
+                    }
+                    return EmptyState(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'لا توجد فواتير بعد',
+                      subtitle: 'أنشئ أول فاتورة لعميلك بسهولة وبنود مفصلة مع دعم العملات المختلفة',
+                      actionLabel: 'إنشاء فاتورة جديدة',
+                      actionIcon: Icons.add,
+                      onAction: () {
+                        context.go('/invoices/new');
+                      },
                     );
                   }
 

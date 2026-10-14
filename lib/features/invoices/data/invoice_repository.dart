@@ -64,6 +64,42 @@ class InvoiceRepository {
     );
   }
 
+  Future<void> updateInvoiceWithItems(
+      int invoiceId, InvoicesCompanion invoiceCompanion, List<InvoiceItemsCompanion> items) async {
+    return _db.transaction(() async {
+      int calculatedTotalMinor = 0;
+      final processedItems = <InvoiceItemsCompanion>[];
+      for (final item in items) {
+        final double qty = item.quantity.value;
+        final int price = item.unitPriceMinor.value;
+        final int lineTotal = (qty * price).round();
+        calculatedTotalMinor += lineTotal;
+
+        processedItems.add(item.copyWith(
+          invoiceId: Value(invoiceId),
+          lineTotalMinor: Value(lineTotal),
+        ));
+      }
+
+      await (_db.update(_db.invoices)..where((tbl) => tbl.id.equals(invoiceId))).write(
+        invoiceCompanion.copyWith(totalMinor: Value(calculatedTotalMinor)),
+      );
+
+      await (_db.delete(_db.invoiceItems)..where((tbl) => tbl.invoiceId.equals(invoiceId))).go();
+
+      for (final item in processedItems) {
+        await _db.into(_db.invoiceItems).insert(item);
+      }
+    });
+  }
+
+  Future<void> deleteInvoice(int invoiceId) async {
+    return _db.transaction(() async {
+      await (_db.delete(_db.invoiceItems)..where((tbl) => tbl.invoiceId.equals(invoiceId))).go();
+      await (_db.delete(_db.invoices)..where((tbl) => tbl.id.equals(invoiceId))).go();
+    });
+  }
+
   Future<String> nextInvoiceNumber() async {
     return _db.transaction(() async {
       var company = await (_db.select(_db.companies)..where((tbl) => tbl.id.equals(1))).getSingleOrNull();

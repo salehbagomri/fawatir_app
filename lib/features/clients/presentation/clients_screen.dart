@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fawatir/app/theme.dart';
 import 'package:fawatir/features/clients/application/client_providers.dart';
+import 'package:fawatir/shared/widgets/empty_state.dart';
 
 class ClientsScreen extends ConsumerWidget {
   const ClientsScreen({super.key});
@@ -51,26 +52,27 @@ class ClientsScreen extends ConsumerWidget {
                 error: (err, stack) => Center(child: Text('خطأ في التحميل: $err')),
                 data: (clients) {
                   if (clients.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.people_outline,
-                            size: 64,
-                            color: AppColors.muted.withValues(alpha: 0.5),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'لا يوجد عملاء بعد',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.muted,
-                            ),
-                          ),
-                        ],
-                      ),
+                    if (search.trim().isNotEmpty) {
+                      return EmptyState(
+                        icon: Icons.search_off_rounded,
+                        title: 'لا توجد نتائج مطابقة',
+                        subtitle: 'لم نتمكن من العثور على عميل يطابق "$search"',
+                        actionLabel: 'مسح البحث',
+                        actionIcon: Icons.clear,
+                        onAction: () {
+                          ref.read(clientSearchProvider.notifier).setQuery('');
+                        },
+                      );
+                    }
+                    return EmptyState(
+                      icon: Icons.people_outline_rounded,
+                      title: 'لا يوجد عملاء بعد',
+                      subtitle: 'ابدأ بإضافة أول عميل لإصدار الفواتير ومتابعة الحسابات والتحصيلات',
+                      actionLabel: 'إضافة عميل جديد',
+                      actionIcon: Icons.person_add_outlined,
+                      onAction: () {
+                        context.go('/clients/add');
+                      },
                     );
                   }
 

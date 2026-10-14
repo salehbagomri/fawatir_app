@@ -8,6 +8,7 @@ import 'package:fawatir/data/db/database.dart';
 import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/subscriptions/application/subscription_providers.dart';
 import 'package:fawatir/features/subscriptions/data/subscription_repository.dart';
+import 'package:fawatir/shared/widgets/confirm_dialog.dart';
 
 class SubscriptionFormScreen extends ConsumerStatefulWidget {
   final int clientId;
@@ -149,6 +150,48 @@ class _SubscriptionFormScreenState extends ConsumerState<SubscriptionFormScreen>
     }
   }
 
+  Future<void> _deleteSubscription() async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'تأكيد حذف الاشتراك',
+      message: 'هل أنت متأكد من رغبتك في حذف هذا الاشتراك نهائياً؟ لن يتم توليد أي فواتير دورية مستقبلية له.',
+      confirmLabel: 'نعم، حذف الاشتراك',
+      cancelLabel: 'تراجع',
+      isDestructive: true,
+      icon: Icons.delete_forever_rounded,
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      await ref.read(subscriptionRepositoryProvider).deleteSubscription(widget.subscriptionId!);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حذف الاشتراك بنجاح'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        context.go('/clients/${widget.clientId}/subscriptions');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ أثناء الحذف: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.subscriptionId != null;
@@ -188,6 +231,12 @@ class _SubscriptionFormScreenState extends ConsumerState<SubscriptionFormScreen>
         appBar: AppBar(
           title: Text(isEditing ? 'تعديل الاشتراك' : 'إضافة اشتراك جديد'),
           actions: [
+            if (isEditing)
+              IconButton(
+                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                tooltip: 'حذف الاشتراك',
+                onPressed: _deleteSubscription,
+              ),
             _isSaving
                 ? const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16.0),
@@ -260,6 +309,10 @@ class _SubscriptionFormScreenState extends ConsumerState<SubscriptionFormScreen>
                   validator: (val) {
                     if (val == null || val.trim().isEmpty) {
                       return 'يرجى إدخال السعر';
+                    }
+                    final d = double.tryParse(val.trim());
+                    if (d == null || d <= 0) {
+                      return 'يجب أن يكون السعر أكبر من 0';
                     }
                     return null;
                   },

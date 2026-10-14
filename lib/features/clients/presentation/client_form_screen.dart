@@ -7,6 +7,7 @@ import 'package:fawatir/data/db/database.dart';
 import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/clients/data/client_repository.dart';
 import 'package:fawatir/features/company/application/company_providers.dart';
+import 'package:fawatir/shared/widgets/confirm_dialog.dart';
 
 class ClientFormScreen extends ConsumerStatefulWidget {
   final int? clientId;
@@ -209,6 +210,14 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.phone),
             ),
+            validator: (val) {
+              if (val != null && val.trim().isNotEmpty) {
+                if (val.trim().length < 4) {
+                  return 'يرجى إدخال رقم هاتف صحيح';
+                }
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 16),
           TextFormField(
@@ -223,7 +232,7 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
           DropdownButtonFormField<String>(
             initialValue: _selectedCurrency,
             decoration: const InputDecoration(
-              labelText: 'عملة الحساب',
+              labelText: 'عملة الحساب *',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.monetization_on),
             ),
@@ -247,7 +256,19 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
             subtitle: const Text('تفعيل العميل لإصدار الفواتير له'),
             value: _isActive,
             activeThumbColor: AppColors.accent,
-            onChanged: (val) {
+            onChanged: (val) async {
+              if (!val && widget.clientId != null) {
+                final confirmed = await showConfirmDialog(
+                  context,
+                  title: 'تعطيل العميل',
+                  message: 'هل أنت متأكد من رغبتك في تعطيل هذا العميل؟ لن يظهر العميل في القوائم النشطة أو خيارات إنشاء الفواتير الجديدة.',
+                  confirmLabel: 'تعطيل العميل',
+                  cancelLabel: 'تراجع',
+                  isDestructive: true,
+                  icon: Icons.person_off_rounded,
+                );
+                if (confirmed != true) return;
+              }
               setState(() {
                 _isActive = val;
               });

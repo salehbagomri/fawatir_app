@@ -10,6 +10,7 @@ import 'package:fawatir/features/payments/application/payment_providers.dart';
 import 'package:fawatir/features/payments/application/receipt_pdf_service.dart';
 import 'package:fawatir/features/payments/data/payment_repository.dart';
 import 'package:fawatir/shared/pdf/receipt_pdf.dart';
+import 'package:fawatir/shared/widgets/confirm_dialog.dart';
 
 class PaymentFormScreen extends ConsumerStatefulWidget {
   final int invoiceId;
@@ -113,11 +114,23 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
   Future<void> _savePayment(Invoice invoice, Client client) async {
     if (!_formKey.currentState!.validate()) return;
 
+    final amountMinor = parseToMinor(_amountController.text);
+    final remainingMinor = ref.read(invoiceRemainingProvider(invoice.id)).value ?? 0;
+    if (remainingMinor > 0 && _currency == invoice.currency && amountMinor > remainingMinor) {
+      final confirmed = await showConfirmDialog(
+        context,
+        title: 'تنبيه: سداد زائد',
+        message: 'المبلغ المدخل (${formatMoney(amountMinor, _currency)}) يتجاوز المبلغ المتبقي على الفاتورة (${formatMoney(remainingMinor, invoice.currency)}).\n\nهل ترغب في المتابعة وتسجيل المبلغ الفائض كرصيد إضافي في حساب العميل؟',
+        confirmLabel: 'متابعة وتسجيل',
+        cancelLabel: 'تعديل المبلغ',
+        icon: Icons.info_outline,
+      );
+      if (confirmed != true) return;
+    }
+
     setState(() {
       _isSaving = true;
     });
-
-    final amountMinor = parseToMinor(_amountController.text);
     final showFxRate = _currency != client.accountCurrency;
     final fxRate = showFxRate
         ? (double.tryParse(_fxRateController.text) ?? 1.0)

@@ -5,6 +5,7 @@ import 'package:fawatir/app/theme.dart';
 import 'package:fawatir/core/money.dart';
 import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/invoices/application/invoice_providers.dart';
+import 'package:drift/drift.dart' hide Column, Table;
 import 'package:fawatir/data/db/database.dart';
 import 'package:fawatir/data/db/tables.dart';
 import 'package:fawatir/features/payments/data/payment_repository.dart';
@@ -15,6 +16,9 @@ import 'package:fawatir/features/statements/data/statement_repository.dart';
 import 'package:fawatir/features/statements/application/statement_providers.dart';
 import 'package:fawatir/shared/pdf/statement_pdf.dart';
 import 'package:fawatir/features/statements/application/statement_pdf_service.dart';
+import 'package:fawatir/features/clients/data/client_repository.dart';
+import 'package:fawatir/shared/widgets/empty_state.dart';
+import 'package:fawatir/shared/widgets/confirm_dialog.dart';
 
 class ClientDetailScreen extends ConsumerStatefulWidget {
   final int clientId;
@@ -65,9 +69,77 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.edit),
+                    tooltip: 'تعديل البيانات',
                     onPressed: () {
                       context.go('/clients/edit/${client.id}');
                     },
+                  ),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert),
+                    tooltip: 'خيارات إضافية',
+                    onSelected: (val) async {
+                      if (val == 'toggle_active') {
+                        final willDeactivate = client.isActive;
+                        if (willDeactivate) {
+                          final confirmed = await showConfirmDialog(
+                            context,
+                            title: 'تعطيل حساب العميل',
+                            message: 'هل أنت متأكد من رغبتك في تعطيل العميل "${client.name}"؟ لن يظهر العميل في القوائم النشطة أو خيارات إنشاء الفواتير الجديدة.',
+                            confirmLabel: 'تعطيل العميل',
+                            cancelLabel: 'تراجع',
+                            isDestructive: true,
+                            icon: Icons.person_off_rounded,
+                          );
+                          if (confirmed != true || !context.mounted) return;
+                        }
+                        try {
+                          await ref.read(clientRepositoryProvider).updateClient(
+                            ClientsCompanion(
+                              id: Value(client.id),
+                              name: Value(client.name),
+                              contactPerson: Value(client.contactPerson),
+                              phone: Value(client.phone),
+                              address: Value(client.address),
+                              notes: Value(client.notes),
+                              accountCurrency: Value(client.accountCurrency),
+                              isActive: Value(!client.isActive),
+                            ),
+                          );
+                          ref.invalidate(clientByIdProvider(client.id));
+                          ref.invalidate(clientsStreamProvider);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(willDeactivate ? 'تم تعطيل حساب العميل' : 'تم تفعيل حساب العميل بنجاح'),
+                                backgroundColor: willDeactivate ? Colors.orange.shade800 : Colors.green.shade700,
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red),
+                            );
+                          }
+                        }
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: 'toggle_active',
+                        child: Row(
+                          children: [
+                            Icon(
+                              client.isActive ? Icons.person_off_outlined : Icons.person_outline,
+                              color: client.isActive ? Colors.red : Colors.green,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(client.isActive ? 'تعطيل العميل' : 'تفعيل العميل'),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -320,22 +392,15 @@ class ClientInvoicesTab extends ConsumerWidget {
       error: (err, stack) => Center(child: Text('خطأ في تحميل الفواتير: $err')),
       data: (invoices) {
         if (invoices.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.receipt_long,
-                  size: 48,
-                  color: AppColors.muted.withValues(alpha: 0.4),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'لا توجد فواتير بعد',
-                  style: TextStyle(color: AppColors.muted, fontSize: 16),
-                ),
-              ],
-            ),
+          return EmptyState(
+            icon: Icons.receipt_long_outlined,
+            title: 'لا توجد فواتير لهذا العميل بعد',
+            subtitle: 'يمكنك إنشاء أول فاتورة وإصدارها لهذا العميل بسهولة',
+            actionLabel: 'إنشاء فاتورة جديدة',
+            actionIcon: Icons.add,
+            onAction: () {
+              context.go('/invoices/new');
+            },
           );
         }
 
@@ -471,22 +536,10 @@ class ClientPaymentsTab extends ConsumerWidget {
       error: (err, stack) => Center(child: Text('خطأ في تحميل التحصيلات: $err')),
       data: (payments) {
         if (payments.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.payment,
-                  size: 48,
-                  color: AppColors.muted.withValues(alpha: 0.4),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'لا توجد تحصيلات بعد',
-                  style: TextStyle(color: AppColors.muted, fontSize: 16),
-                ),
-              ],
-            ),
+          return const EmptyState(
+            icon: Icons.payments_outlined,
+            title: 'لا توجد تحصيلات مسجلة بعد',
+            subtitle: 'ستظهر هنا كافة الدفعات وسندات القبض المسددة لهذا العميل',
           );
         }
 
@@ -827,22 +880,13 @@ class _ClientStatementTabState extends State<ClientStatementTab> {
                 error: (err, stack) => Center(child: Text('خطأ في تحميل كشف الحساب: $err')),
                 data: (statement) {
                   if (statement.entries.isEmpty && statement.openingBalanceMinor == 0) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.history_toggle_off,
-                            size: 48,
-                            color: AppColors.muted.withValues(alpha: 0.4),
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'لا توجد عمليات مسجلة في هذه الفترة',
-                            style: TextStyle(color: AppColors.muted, fontSize: 15),
-                          ),
-                        ],
-                      ),
+                    return EmptyState(
+                      icon: Icons.account_balance_wallet_outlined,
+                      title: 'لا توجد حركات في هذه الفترة',
+                      subtitle: 'جرّب توسيع النطاق الزمني أو إعادة ضبط التصفية لعرض السجلات',
+                      actionLabel: (_fromDate != null || _toDate != null) ? 'إعادة ضبط التصفية' : null,
+                      actionIcon: Icons.refresh,
+                      onAction: (_fromDate != null || _toDate != null) ? _resetFilter : null,
                     );
                   }
 

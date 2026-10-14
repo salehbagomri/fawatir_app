@@ -6,6 +6,8 @@ import 'package:fawatir/core/money.dart';
 import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/subscriptions/application/subscription_providers.dart';
 import 'package:fawatir/features/subscriptions/data/subscription_repository.dart';
+import 'package:fawatir/shared/widgets/empty_state.dart';
+import 'package:fawatir/shared/widgets/confirm_dialog.dart';
 
 class SubscriptionsScreen extends ConsumerWidget {
   final int clientId;
@@ -43,26 +45,15 @@ class SubscriptionsScreen extends ConsumerWidget {
           error: (err, stack) => Center(child: Text('خطأ في تحميل الاشتراكات: $err')),
           data: (subscriptions) {
             if (subscriptions.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.autorenew_outlined,
-                      size: 64,
-                      color: AppColors.muted.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'لا توجد اشتراكات بعد لهذا العميل',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.muted,
-                      ),
-                    ),
-                  ],
-                ),
+              return EmptyState(
+                icon: Icons.autorenew_outlined,
+                title: 'لا توجد اشتراكات لهذا العميل',
+                subtitle: 'أضف اشتراكاً شهرياً دورياً ليتم توليد فواتير مستحقة له تلقائياً كل شهر',
+                actionLabel: 'إضافة اشتراك جديد',
+                actionIcon: Icons.add,
+                onAction: () {
+                  context.go('/clients/$clientId/subscriptions/add');
+                },
               );
             }
 
@@ -133,6 +124,18 @@ class SubscriptionsScreen extends ConsumerWidget {
                           value: sub.isActive,
                           activeThumbColor: AppColors.accent,
                           onChanged: (val) async {
+                            if (!val) {
+                              final confirmed = await showConfirmDialog(
+                                context,
+                                title: 'إيقاف الاشتراك',
+                                message: 'هل أنت متأكد من إيقاف اشتراك "${sub.title}"؟ لن يتم توليد أي فواتير جديدة له في الأشهر القادمة طالما أنه متوقف.',
+                                confirmLabel: 'إيقاف الاشتراك',
+                                cancelLabel: 'تراجع',
+                                isDestructive: true,
+                                icon: Icons.pause_circle_outline,
+                              );
+                              if (confirmed != true) return;
+                            }
                             try {
                               await ref.read(subscriptionRepositoryProvider).setSubscriptionActive(sub.id, val);
                               if (context.mounted) {
