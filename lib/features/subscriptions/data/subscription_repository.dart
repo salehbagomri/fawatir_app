@@ -14,6 +14,13 @@ class SubscriptionRepository {
         .watch();
   }
 
+  Future<List<Subscription>> getSubscriptions(int clientId) {
+    return (_db.select(_db.subscriptions)
+          ..where((tbl) => tbl.clientId.equals(clientId))
+          ..orderBy([(tbl) => OrderingTerm(expression: tbl.startDate, mode: OrderingMode.desc)]))
+        .get();
+  }
+
   Future<int> addSubscription(SubscriptionsCompanion data) {
     return _db.into(_db.subscriptions).insert(data);
   }

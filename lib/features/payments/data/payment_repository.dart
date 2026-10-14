@@ -127,3 +127,16 @@ bool isInvoiceOverdue(Invoice i) =>
     DateTime.now().isAfter(i.dueDate!) &&
     i.status != InvoiceStatus.paid &&
     i.status != InvoiceStatus.cancelled;
+
+/// الحصول على الحالة الفعلية للفاتورة مع الأخذ بالاعتبار ما إذا كانت متأخرة
+InvoiceStatus getEffectiveInvoiceStatus(Invoice i) {
+  if (i.status == InvoiceStatus.paid ||
+      i.status == InvoiceStatus.cancelled ||
+      i.status == InvoiceStatus.draft) {
+    return i.status;
+  }
+  if (isInvoiceOverdue(i)) {
+    return InvoiceStatus.overdue;
+  }
+  return i.status;
+}

@@ -8,6 +8,8 @@ import 'package:fawatir/features/company/application/company_providers.dart';
 import 'package:fawatir/features/invoices/data/invoice_repository.dart';
 import 'package:fawatir/features/invoices/application/invoice_providers.dart';
 import 'package:fawatir/shared/widgets/confirm_dialog.dart';
+import 'package:fawatir/shared/widgets/app_snackbar.dart';
+import 'package:fawatir/features/payments/data/payment_repository.dart';
 import '../data/dashboard_repository.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -46,7 +48,6 @@ class _DashboardBody extends ConsumerWidget {
     if (confirmed != true || !context.mounted) return;
 
     final nav = Navigator.of(context, rootNavigator: true);
-    final messenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
@@ -60,12 +61,9 @@ class _DashboardBody extends ConsumerWidget {
       nav.pop();
 
       if (createdIds.isEmpty) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('لا توجد اشتراكات مستحقة لتوليد فواتير جديدة لها هذا الشهر'),
-            backgroundColor: AppColors.accent,
-          ),
-        );
+        if (context.mounted) {
+          AppSnackBar.showInfo(context, 'لا توجد اشتراكات مستحقة لتوليد فواتير جديدة لها هذا الشهر');
+        }
       } else {
         ref.read(invoiceStatusFilterProvider.notifier).setFilter(InvoiceStatus.draft);
         if (context.mounted) {
@@ -74,9 +72,9 @@ class _DashboardBody extends ConsumerWidget {
       }
     } catch (e) {
       nav.pop();
-      messenger.showSnackBar(
-        SnackBar(content: Text('خطأ أثناء توليد الفواتير: $e'), backgroundColor: Colors.red),
-      );
+      if (context.mounted) {
+        AppSnackBar.showError(context, 'خطأ أثناء توليد الفواتير: $e');
+      }
     }
   }
 
@@ -775,7 +773,7 @@ class _DashboardBody extends ConsumerWidget {
 
             return Column(
               children: invoices.map((item) {
-                final status = item.invoice.status;
+                final status = getEffectiveInvoiceStatus(item.invoice);
                 final statusColor = _getStatusColor(status);
                 final statusLabel = _getStatusLabel(status);
                 final dateStr =

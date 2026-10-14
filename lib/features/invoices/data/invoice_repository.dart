@@ -44,7 +44,17 @@ class InvoiceRepository {
       query.where((tbl) => tbl.clientId.equals(clientId));
     }
     if (status != null) {
-      query.where((tbl) => tbl.status.equals(status.index));
+      if (status == InvoiceStatus.overdue) {
+        final now = DateTime.now();
+        query.where((tbl) =>
+            tbl.dueDate.isNotNull() &
+            tbl.dueDate.isSmallerThanValue(now) &
+            tbl.status.equals(InvoiceStatus.paid.index).not() &
+            tbl.status.equals(InvoiceStatus.cancelled.index).not() &
+            tbl.status.equals(InvoiceStatus.draft.index).not());
+      } else {
+        query.where((tbl) => tbl.status.equals(status.index));
+      }
     }
     query.orderBy([(tbl) => OrderingTerm(expression: tbl.issueDate, mode: OrderingMode.desc)]);
     return query.watch();

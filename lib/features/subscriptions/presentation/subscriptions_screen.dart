@@ -8,6 +8,7 @@ import 'package:fawatir/features/subscriptions/application/subscription_provider
 import 'package:fawatir/features/subscriptions/data/subscription_repository.dart';
 import 'package:fawatir/shared/widgets/empty_state.dart';
 import 'package:fawatir/shared/widgets/confirm_dialog.dart';
+import 'package:fawatir/shared/widgets/app_snackbar.dart';
 
 class SubscriptionsScreen extends ConsumerWidget {
   final int clientId;
@@ -139,18 +140,15 @@ class SubscriptionsScreen extends ConsumerWidget {
                             try {
                               await ref.read(subscriptionRepositoryProvider).setSubscriptionActive(sub.id, val);
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(val ? 'تم تفعيل الاشتراك بنجاح' : 'تم إيقاف الاشتراك بنجاح'),
-                                    backgroundColor: val ? Colors.green.shade700 : Colors.grey.shade700,
-                                  ),
-                                );
+                                if (val) {
+                                  AppSnackBar.showSuccess(context, 'تم تفعيل الاشتراك بنجاح');
+                                } else {
+                                  AppSnackBar.showWarning(context, 'تم إيقاف الاشتراك بنجاح');
+                                }
                               }
                             } catch (e) {
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('خطأ أثناء تعديل حالة الاشتراك: $e'), backgroundColor: Colors.red),
-                                );
+                                AppSnackBar.showError(context, 'خطأ أثناء تعديل حالة الاشتراك: $e');
                               }
                             }
                           },

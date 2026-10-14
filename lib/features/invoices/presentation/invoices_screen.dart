@@ -192,8 +192,9 @@ class InvoicesScreen extends ConsumerWidget {
                         itemBuilder: (context, index) {
                           final invoice = invoices[index];
                           final clientName = clientsMap[invoice.clientId] ?? 'عميل غير معروف';
+                          final effectiveStatus = getEffectiveInvoiceStatus(invoice);
                           final isOverdueValue = isInvoiceOverdue(invoice);
-                          final statusColor = _getStatusColor(invoice.status);
+                          final statusColor = _getStatusColor(effectiveStatus);
 
                           return Card(
                             elevation: 0.8,
@@ -299,7 +300,7 @@ class InvoicesScreen extends ConsumerWidget {
                                             border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                                           ),
                                           child: Text(
-                                            _getStatusLabel(invoice.status),
+                                            _getStatusLabel(effectiveStatus),
                                             style: TextStyle(
                                               color: statusColor,
                                               fontSize: 11,

@@ -8,6 +8,7 @@ import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/clients/data/client_repository.dart';
 import 'package:fawatir/features/company/application/company_providers.dart';
 import 'package:fawatir/shared/widgets/confirm_dialog.dart';
+import 'package:fawatir/shared/widgets/app_snackbar.dart';
 
 class ClientFormScreen extends ConsumerStatefulWidget {
   final int? clientId;
@@ -81,19 +82,15 @@ class _ClientFormScreenState extends ConsumerState<ClientFormScreen> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isEditing ? 'تم تحديث بيانات العميل بنجاح' : 'تم إضافة العميل بنجاح'),
-            backgroundColor: AppColors.accent,
-          ),
+        AppSnackBar.showSuccess(
+          context,
+          isEditing ? 'تم تحديث بيانات العميل بنجاح' : 'تم إضافة العميل بنجاح',
         );
         Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ أثناء الحفظ: $e'), backgroundColor: Colors.red),
-        );
+        AppSnackBar.showError(context, 'حدث خطأ أثناء الحفظ: $e');
       }
     } finally {
       if (mounted) {

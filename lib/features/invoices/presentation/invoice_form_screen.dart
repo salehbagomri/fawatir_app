@@ -10,6 +10,7 @@ import 'package:fawatir/features/invoices/data/invoice_repository.dart';
 
 import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/payments/application/payment_providers.dart';
+import 'package:fawatir/shared/widgets/app_snackbar.dart';
 
 class InvoiceItemRow {
   final descriptionController = TextEditingController();
@@ -284,12 +285,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('تم تعديل الفاتورة رقم $number بنجاح'),
-              backgroundColor: AppColors.accent,
-            ),
-          );
+          AppSnackBar.showSuccess(context, 'تم تعديل الفاتورة رقم $number بنجاح');
           Navigator.of(context).pop();
         }
       } else {
@@ -315,20 +311,13 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('تم إنشاء الفاتورة رقم $number بنجاح'),
-              backgroundColor: AppColors.accent,
-            ),
-          );
+          AppSnackBar.showSuccess(context, 'تم إنشاء الفاتورة رقم $number بنجاح');
           Navigator.of(context).pop();
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ أثناء الحفظ: $e'), backgroundColor: Colors.red),
-        );
+        AppSnackBar.showError(context, 'حدث خطأ أثناء الحفظ: $e');
       }
     } finally {
       if (mounted) {

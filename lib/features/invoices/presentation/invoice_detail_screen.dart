@@ -11,8 +11,10 @@ import 'package:fawatir/features/invoices/application/invoice_pdf_service.dart';
 import 'package:fawatir/features/payments/application/payment_providers.dart';
 import 'package:fawatir/features/payments/application/receipt_pdf_service.dart';
 import 'package:fawatir/features/payments/data/payment_repository.dart';
+import 'package:fawatir/data/db/database.dart';
 import 'package:fawatir/shared/pdf/invoice_pdf.dart';
 import 'package:fawatir/shared/pdf/receipt_pdf.dart';
+import 'package:fawatir/shared/widgets/app_snackbar.dart';
 
 class InvoiceDetailScreen extends ConsumerWidget {
   final int invoiceId;
@@ -98,6 +100,50 @@ class InvoiceDetailScreen extends ConsumerWidget {
                       'تم اعتماد الفاتورة وتحويلها إلى مرسلة',
                     );
                   } else if (value == 'cancel') {
+                    // التحقق من وجود دفعات مسجلة على الفاتورة قبل الإلغاء
+                    final payments = await (ref.read(databaseProvider).select(ref.read(databaseProvider).payments)
+                          ..where((p) => p.invoiceId.equals(invoice.id)))
+                        .get();
+
+                    if (payments.isNotEmpty) {
+                      final totalPaid = payments.fold<int>(0, (s, p) => s + p.amountMinor);
+                      if (context.mounted) {
+                        await showDialog(
+                          context: context,
+                          builder: (ctx) => Directionality(
+                            textDirection: TextDirection.rtl,
+                            child: AlertDialog(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              title: const Row(
+                                children: [
+                                  Icon(Icons.shield_outlined, color: Colors.red),
+                                  SizedBox(width: 8),
+                                  Text('تعذّر إلغاء الفاتورة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                                ],
+                              ),
+                              content: Text(
+                                'توجد ${payments.length} دفعات محصلة مسجلة على هذه الفاتورة بإجمالي ${formatMoney(totalPaid, invoice.currency)}.\n\nلحماية سلامة الحسابات والسجلات المالية، لا يمكن إلغاء فاتورة تم سداد جزء منها أو بالكامل دون تسوية الدفعات المرتبطة بها أولاً.',
+                                style: const TextStyle(fontSize: 14, height: 1.4),
+                              ),
+                              actions: [
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.accent,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  ),
+                                  onPressed: () => Navigator.of(ctx).pop(),
+                                  child: const Text('حسناً، فهمت'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    if (!context.mounted) return;
                     final confirmed = await _confirmCancelInvoice(context);
                     if (confirmed == true && context.mounted) {
                       await _changeInvoiceStatus(
@@ -171,8 +217,9 @@ class InvoiceDetailScreen extends ConsumerWidget {
               ),
               data: (client) {
                 final clientName = client?.name ?? 'عميل غير معروف';
+                final effectiveStatus = getEffectiveInvoiceStatus(invoice);
                 final isOverdueValue = isInvoiceOverdue(invoice);
-                final statusColor = _getStatusColor(invoice.status);
+                final statusColor = _getStatusColor(effectiveStatus);
                 final showFxRate = client != null && invoice.currency != client.accountCurrency;
 
                 return SingleChildScrollView(
@@ -212,7 +259,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
                                           borderRadius: BorderRadius.circular(6),
                                         ),
                                         child: Text(
-                                          _getStatusLabel(invoice.status),
+                                          _getStatusLabel(effectiveStatus),
                                           style: TextStyle(
                                             color: statusColor,
                                             fontSize: 12,
@@ -220,7 +267,7 @@ class InvoiceDetailScreen extends ConsumerWidget {
                                           ),
                                         ),
                                       ),
-                                      if (isOverdueValue) ...[
+                                      if (isOverdueValue && effectiveStatus != InvoiceStatus.overdue) ...[
                                         const SizedBox(width: 8),
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -785,7 +832,6 @@ class InvoiceDetailScreen extends ConsumerWidget {
     InvoiceStatus newStatus,
     String successMessage,
   ) async {
-    final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(invoiceRepositoryProvider).updateInvoiceStatus(id, newStatus);
       ref.invalidate(invoiceByIdProvider(id));
@@ -793,13 +839,13 @@ class InvoiceDetailScreen extends ConsumerWidget {
       ref.invalidate(invoicesListProvider);
       ref.invalidate(clientInvoicesProvider(clientId));
       ref.invalidate(clientBalanceProvider(clientId));
-      messenger.showSnackBar(
-        SnackBar(content: Text(successMessage), backgroundColor: Colors.green),
-      );
+      if (context.mounted) {
+        AppSnackBar.showSuccess(context, successMessage);
+      }
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('خطأ أثناء تحديث حالة الفاتورة: $e'), backgroundColor: Colors.red),
-      );
+      if (context.mounted) {
+        AppSnackBar.showError(context, 'خطأ أثناء تحديث حالة الفاتورة: $e');
+      }
     }
   }
 

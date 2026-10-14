@@ -9,6 +9,7 @@ import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/subscriptions/application/subscription_providers.dart';
 import 'package:fawatir/features/subscriptions/data/subscription_repository.dart';
 import 'package:fawatir/shared/widgets/confirm_dialog.dart';
+import 'package:fawatir/shared/widgets/app_snackbar.dart';
 
 class SubscriptionFormScreen extends ConsumerStatefulWidget {
   final int clientId;
@@ -127,19 +128,15 @@ class _SubscriptionFormScreenState extends ConsumerState<SubscriptionFormScreen>
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isEditing ? 'تم تحديث الاشتراك بنجاح' : 'تم إضافة الاشتراك بنجاح'),
-            backgroundColor: AppColors.accent,
-          ),
+        AppSnackBar.showSuccess(
+          context,
+          isEditing ? 'تم تحديث الاشتراك بنجاح' : 'تم إضافة الاشتراك بنجاح',
         );
         context.go('/clients/${widget.clientId}/subscriptions');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ أثناء الحفظ: $e'), backgroundColor: Colors.red),
-        );
+        AppSnackBar.showError(context, 'حدث خطأ أثناء الحفظ: $e');
       }
     } finally {
       if (mounted) {

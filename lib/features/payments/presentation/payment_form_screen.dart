@@ -11,6 +11,7 @@ import 'package:fawatir/features/payments/application/receipt_pdf_service.dart';
 import 'package:fawatir/features/payments/data/payment_repository.dart';
 import 'package:fawatir/shared/pdf/receipt_pdf.dart';
 import 'package:fawatir/shared/widgets/confirm_dialog.dart';
+import 'package:fawatir/shared/widgets/app_snackbar.dart';
 
 class PaymentFormScreen extends ConsumerStatefulWidget {
   final int invoiceId;
@@ -166,12 +167,7 @@ class _PaymentFormScreenState extends ConsumerState<PaymentFormScreen> {
       _showSuccessDialog(paymentId, amountMinor, _currency);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('حدث خطأ أثناء حفظ التحصيل: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'حدث خطأ أثناء حفظ التحصيل: $e');
       }
     } finally {
       if (mounted) {

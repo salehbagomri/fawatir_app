@@ -9,6 +9,7 @@ import 'package:fawatir/core/money.dart';
 import 'package:fawatir/data/db/database.dart';
 import 'package:fawatir/features/company/application/company_providers.dart';
 import 'package:fawatir/features/company/data/company_repository.dart';
+import 'package:fawatir/shared/widgets/app_snackbar.dart';
 
 class CompanyFormScreen extends ConsumerStatefulWidget {
   const CompanyFormScreen({super.key});
@@ -101,19 +102,12 @@ class _CompanyFormScreenState extends ConsumerState<CompanyFormScreen> {
     try {
       await ref.read(companyRepositoryProvider).saveCompany(companion);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم حفظ بيانات الشركة بنجاح'),
-            backgroundColor: AppColors.accent,
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'تم حفظ بيانات الشركة بنجاح');
         Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ أثناء الحفظ: $e'), backgroundColor: Colors.red),
-        );
+        AppSnackBar.showError(context, 'خطأ أثناء الحفظ: $e');
       }
     } finally {
       if (mounted) {

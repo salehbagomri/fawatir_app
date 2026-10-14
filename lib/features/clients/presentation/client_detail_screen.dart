@@ -19,6 +19,8 @@ import 'package:fawatir/features/statements/application/statement_pdf_service.da
 import 'package:fawatir/features/clients/data/client_repository.dart';
 import 'package:fawatir/shared/widgets/empty_state.dart';
 import 'package:fawatir/shared/widgets/confirm_dialog.dart';
+import 'package:fawatir/shared/widgets/app_snackbar.dart';
+import 'package:fawatir/features/subscriptions/data/subscription_repository.dart';
 
 class ClientDetailScreen extends ConsumerStatefulWidget {
   final int clientId;
@@ -81,10 +83,23 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen> {
                       if (val == 'toggle_active') {
                         final willDeactivate = client.isActive;
                         if (willDeactivate) {
+                          final balance = await ref.read(paymentRepositoryProvider).clientAccountBalanceMinor(client.id);
+                          final subs = await ref.read(subscriptionRepositoryProvider).getSubscriptions(client.id);
+                          final activeSubsCount = subs.where((s) => s.isActive).length;
+
+                          String message = 'هل أنت متأكد من رغبتك في تعطيل العميل "${client.name}"؟ لن يظهر العميل في القوائم النشطة أو خيارات إنشاء الفواتير الجديدة.';
+                          if (balance > 0) {
+                            message += '\n\n⚠️ تنبيه: العميل عليه مديونية مستحقة قدرها ${formatMoney(balance, client.accountCurrency)}. يُنصح بتسوية المستحقات أولاً.';
+                          }
+                          if (activeSubsCount > 0) {
+                            message += '\n\n⚠️ تنبيه: لدى هذا العميل ($activeSubsCount) اشتراك دوري نشط. تعطيل العميل سيوقف توليد الفواتير الدورية له تلقائياً.';
+                          }
+
+                          if (!context.mounted) return;
                           final confirmed = await showConfirmDialog(
                             context,
                             title: 'تعطيل حساب العميل',
-                            message: 'هل أنت متأكد من رغبتك في تعطيل العميل "${client.name}"؟ لن يظهر العميل في القوائم النشطة أو خيارات إنشاء الفواتير الجديدة.',
+                            message: message,
                             confirmLabel: 'تعطيل العميل',
                             cancelLabel: 'تراجع',
                             isDestructive: true,
@@ -108,18 +123,15 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen> {
                           ref.invalidate(clientByIdProvider(client.id));
                           ref.invalidate(clientsStreamProvider);
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(willDeactivate ? 'تم تعطيل حساب العميل' : 'تم تفعيل حساب العميل بنجاح'),
-                                backgroundColor: willDeactivate ? Colors.orange.shade800 : Colors.green.shade700,
-                              ),
-                            );
+                            if (willDeactivate) {
+                              AppSnackBar.showWarning(context, 'تم تعطيل حساب العميل بنجاح');
+                            } else {
+                              AppSnackBar.showSuccess(context, 'تم تفعيل حساب العميل بنجاح');
+                            }
                           }
                         } catch (e) {
                           if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('حدث خطأ: $e'), backgroundColor: Colors.red),
-                            );
+                            AppSnackBar.showError(context, 'حدث خطأ: $e');
                           }
                         }
                       }
@@ -410,7 +422,8 @@ class ClientInvoicesTab extends ConsumerWidget {
           separatorBuilder: (context, index) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
             final invoice = invoices[index];
-            final statusColor = _getStatusColor(invoice.status);
+            final effectiveStatus = getEffectiveInvoiceStatus(invoice);
+            final statusColor = _getStatusColor(effectiveStatus);
 
             return Card(
               elevation: 1,
@@ -467,7 +480,7 @@ class ClientInvoicesTab extends ConsumerWidget {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              _getStatusLabel(invoice.status),
+                              _getStatusLabel(effectiveStatus),
                               style: TextStyle(
                                 color: statusColor,
                                 fontSize: 11,
