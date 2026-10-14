@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fawatir/app/theme.dart';
 import 'package:fawatir/core/money.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fawatir/data/db/tables.dart';
 import 'package:fawatir/features/company/application/company_providers.dart';
+import 'package:fawatir/features/invoices/data/invoice_repository.dart';
+import 'package:fawatir/features/invoices/application/invoice_providers.dart';
+import 'package:fawatir/shared/widgets/confirm_dialog.dart';
 import '../data/dashboard_repository.dart';
 
 class DashboardScreen extends ConsumerWidget {
@@ -29,6 +33,86 @@ class DashboardScreen extends ConsumerWidget {
 class _DashboardBody extends ConsumerWidget {
   final DashboardStats stats;
   const _DashboardBody({required this.stats});
+
+  Future<void> _generateMonthlyInvoices(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: 'توليد فواتير الشهر',
+      message: 'هل تريد فحص كافة الاشتراكات وتوليد فواتير مسودة جديدة للاشتراكات المستحقة لهذا الشهر؟ لن يتم تكرار أي فواتير تم توليدها مسبقاً لنفس الشهر.',
+      confirmLabel: 'بدء التوليد',
+      cancelLabel: 'إلغاء',
+      icon: Icons.autorenew_rounded,
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final nav = Navigator.of(context, rootNavigator: true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final repo = ref.read(invoiceRepositoryProvider);
+      final createdIds = await repo.generateMonthlyInvoices();
+      nav.pop();
+
+      if (createdIds.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('لا توجد اشتراكات مستحقة لتوليد فواتير جديدة لها هذا الشهر'),
+            backgroundColor: AppColors.accent,
+          ),
+        );
+      } else {
+        ref.read(invoiceStatusFilterProvider.notifier).setFilter(InvoiceStatus.draft);
+        if (context.mounted) {
+          context.push('/invoices/drafts-review', extra: createdIds);
+        }
+      }
+    } catch (e) {
+      nav.pop();
+      messenger.showSnackBar(
+        SnackBar(content: Text('خطأ أثناء توليد الفواتير: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Color _getStatusColor(InvoiceStatus status) {
+    switch (status) {
+      case InvoiceStatus.draft:
+        return const Color(0xFF6B7280);
+      case InvoiceStatus.sent:
+        return const Color(0xFF2563EB);
+      case InvoiceStatus.paid:
+        return const Color(0xFF059669);
+      case InvoiceStatus.partiallyPaid:
+        return const Color(0xFFD97706);
+      case InvoiceStatus.overdue:
+        return const Color(0xFFDC2626);
+      case InvoiceStatus.cancelled:
+        return const Color(0xFF4B5563);
+    }
+  }
+
+  String _getStatusLabel(InvoiceStatus status) {
+    switch (status) {
+      case InvoiceStatus.draft:
+        return 'مسودة';
+      case InvoiceStatus.sent:
+        return 'مرسلة';
+      case InvoiceStatus.paid:
+        return 'مدفوعة';
+      case InvoiceStatus.partiallyPaid:
+        return 'مدفوعة جزئياً';
+      case InvoiceStatus.overdue:
+        return 'متأخرة';
+      case InvoiceStatus.cancelled:
+        return 'ملغاة';
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -125,12 +209,23 @@ class _DashboardBody extends ConsumerWidget {
               // ── بانر إعداد بيانات الشركة لأول تشغيل ──
               if (isCompanyIncomplete) _buildCompanyOnboardingBanner(context),
 
+              // ── قسم المتأخرات العاجلة إن وُجدت ──
+              _buildOverdueSection(context, ref),
+
               // ── صف البطاقات الرئيسية ──
               _buildMainCards(context),
               const SizedBox(height: 20),
 
+              // ── إجراءات سريعة ──
+              _buildQuickActions(context, ref),
+              const SizedBox(height: 20),
+
               // ── تحصيلات الشهر ──
               _buildCollectionsCard(context),
+              const SizedBox(height: 20),
+
+              // ── آخر الفواتير ──
+              _buildRecentInvoices(context, ref),
               const SizedBox(height: 20),
 
               // ── ملخص سريع ──
@@ -365,6 +460,443 @@ class _DashboardBody extends ConsumerWidget {
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildOverdueSection(BuildContext context, WidgetRef ref) {
+    final overdueAsync = ref.watch(overdueInvoicesProvider);
+
+    return overdueAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (err, stack) => const SizedBox.shrink(),
+      data: (overdueList) {
+        if (overdueList.isEmpty) return const SizedBox.shrink();
+
+        final now = DateTime.now();
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 20),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFEF2F2),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFFCA5A5)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFDC2626).withValues(alpha: 0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDC2626).withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFDC2626),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'متأخرات تتطلب اهتماماً',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: Color(0xFF991B1B),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDC2626),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${overdueList.length} متأخرة',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...overdueList.map((item) {
+                final daysOverdue = item.invoice.dueDate != null
+                    ? now.difference(item.invoice.dueDate!).inDays
+                    : 0;
+                final overdueText = daysOverdue <= 0
+                    ? 'مستحقة اليوم'
+                    : 'متأخرة منذ $daysOverdue ${daysOverdue == 1 ? "يوم" : daysOverdue == 2 ? "يومين" : daysOverdue <= 10 ? "أيام" : "يوماً"}';
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFECACA)),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => context.push('/invoices/${item.invoice.id}'),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        item.invoice.number,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: AppColors.dark,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          item.clientName,
+                                          style: TextStyle(
+                                            color: AppColors.muted,
+                                            fontSize: 12,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.schedule, size: 12, color: Color(0xFFDC2626)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        overdueText,
+                                        style: const TextStyle(
+                                          color: Color(0xFFDC2626),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const Text(' • ', style: TextStyle(color: Colors.grey, fontSize: 10)),
+                                      Text(
+                                        formatMoney(item.invoice.totalMinor, item.invoice.currency),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                          color: Color(0xFF991B1B),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFDC2626),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                visualDensity: VisualDensity.compact,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              icon: const Icon(Icons.payment, size: 14),
+                              label: const Text(
+                                'سداد',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                              ),
+                              onPressed: () {
+                                context.push('/invoices/${item.invoice.id}/pay');
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildQuickActions(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.bolt_rounded, color: AppColors.accent, size: 20),
+            const SizedBox(width: 8),
+            const Text(
+              'إجراءات سريعة',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.dark,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.post_add_rounded,
+                label: 'فاتورة جديدة',
+                color: const Color(0xFF1F3A5F),
+                onTap: () => context.push('/invoices/new'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.person_add_alt_1_rounded,
+                label: 'عميل جديد',
+                color: const Color(0xFF7C3AED),
+                onTap: () => context.push('/clients/add'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.autorenew_rounded,
+                label: 'توليد الفواتير',
+                color: const Color(0xFF059669),
+                onTap: () => _generateMonthlyInvoices(context, ref),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecentInvoices(BuildContext context, WidgetRef ref) {
+    final recentAsync = ref.watch(recentInvoicesProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.history_rounded, color: AppColors.accent, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'آخر الفواتير',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.dark,
+                  ),
+                ),
+              ],
+            ),
+            TextButton.icon(
+              onPressed: () => context.go('/invoices'),
+              icon: const Icon(Icons.arrow_back, size: 14),
+              label: const Text(
+                'عرض الكل',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.accent,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        recentAsync.when(
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24.0),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          error: (err, stack) => Text('خطأ في تحميل الفواتير: $err'),
+          data: (invoices) {
+            if (invoices.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.line),
+                ),
+                child: Column(
+                  children: [
+                    Icon(Icons.receipt_long_outlined, size: 36, color: AppColors.muted),
+                    const SizedBox(height: 8),
+                    Text(
+                      'لا توجد فواتير مسجلة بعد',
+                      style: TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Column(
+              children: invoices.map((item) {
+                final status = item.invoice.status;
+                final statusColor = _getStatusColor(status);
+                final statusLabel = _getStatusLabel(status);
+                final dateStr =
+                    '${item.invoice.issueDate.year}/${item.invoice.issueDate.month.toString().padLeft(2, '0')}/${item.invoice.issueDate.day.toString().padLeft(2, '0')}';
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.line),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                    child: InkWell(
+                      onTap: () => context.push('/invoices/${item.invoice.id}'),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.receipt_outlined,
+                                color: statusColor,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        item.invoice.number,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: AppColors.dark,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: statusColor.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          statusLabel,
+                                          style: TextStyle(
+                                            color: statusColor,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          item.clientName,
+                                          style: TextStyle(
+                                            color: AppColors.muted,
+                                            fontSize: 12,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const Text(' • ', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                      Text(
+                                        dateStr,
+                                        style: TextStyle(
+                                          color: AppColors.muted,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              formatMoney(item.invoice.totalMinor, item.invoice.currency),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: AppColors.dark,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -658,6 +1190,75 @@ class _SummaryRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────
+// زر إجراء سريع
+// ─────────────────────────────────────────────────
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      elevation: 0,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.line),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.dark,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

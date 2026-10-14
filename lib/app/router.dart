@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fawatir/app/theme.dart';
+import 'package:fawatir/features/splash/presentation/splash_screen.dart';
 import 'package:fawatir/features/dashboard/presentation/dashboard_screen.dart';
+import 'package:fawatir/features/dashboard/data/dashboard_repository.dart';
 import 'package:fawatir/features/clients/presentation/clients_screen.dart';
 import 'package:fawatir/features/invoices/presentation/invoices_screen.dart';
 import 'package:fawatir/features/settings/presentation/settings_screen.dart';
@@ -14,14 +18,17 @@ import 'package:fawatir/features/invoices/presentation/invoice_detail_screen.dar
 import 'package:fawatir/features/payments/presentation/payment_form_screen.dart';
 import 'package:fawatir/features/subscriptions/presentation/generated_drafts_screen.dart';
 
-
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 final goRouter = GoRouter(
   navigatorKey: _rootNavigatorKey,
-  initialLocation: '/dashboard',
+  initialLocation: '/splash',
   debugLogDiagnostics: true,
   routes: [
+    GoRoute(
+      path: '/splash',
+      builder: (context, state) => const SplashScreen(),
+    ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return AppShell(navigationShell: navigationShell);
@@ -162,7 +169,7 @@ final goRouter = GoRouter(
   ],
 );
 
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({
     super.key,
     required this.navigationShell,
@@ -171,35 +178,64 @@ class AppShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: (int index) {
-          navigationShell.goBranch(
-            index,
-            initialLocation: index == navigationShell.currentIndex,
-          );
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard),
-            label: 'الرئيسية',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people),
-            label: 'العملاء',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.receipt_long),
-            label: 'الفواتير',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings),
-            label: 'الإعدادات',
-          ),
-        ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stats = ref.watch(dashboardStatsProvider).value;
+    final overdueCount = stats?.overdueInvoiceCount ?? 0;
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        body: navigationShell,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: navigationShell.currentIndex,
+          elevation: 3,
+          backgroundColor: Colors.white,
+          indicatorColor: AppColors.accent.withValues(alpha: 0.15),
+          onDestinationSelected: (int index) {
+            navigationShell.goBranch(
+              index,
+              initialLocation: index == navigationShell.currentIndex,
+            );
+          },
+          destinations: [
+            const NavigationDestination(
+              icon: Icon(Icons.dashboard_outlined),
+              selectedIcon: Icon(Icons.dashboard_rounded, color: AppColors.accent),
+              label: 'الرئيسية',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.people_outline_rounded),
+              selectedIcon: Icon(Icons.people_rounded, color: AppColors.accent),
+              label: 'العملاء',
+            ),
+            NavigationDestination(
+              icon: Badge(
+                isLabelVisible: overdueCount > 0,
+                label: Text(
+                  '$overdueCount',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                ),
+                backgroundColor: Colors.red.shade700,
+                child: const Icon(Icons.receipt_long_outlined),
+              ),
+              selectedIcon: Badge(
+                isLabelVisible: overdueCount > 0,
+                label: Text(
+                  '$overdueCount',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                ),
+                backgroundColor: Colors.red.shade700,
+                child: const Icon(Icons.receipt_long_rounded, color: AppColors.accent),
+              ),
+              label: 'الفواتير',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings_rounded, color: AppColors.accent),
+              label: 'الإعدادات',
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -180,6 +180,73 @@ class DashboardRepository {
         .watch()
         .asyncMap((_) => getStats());
   }
+
+  /// أحدث الفواتير المسجلة مع بيانات العميل
+  Stream<List<DashboardInvoiceItem>> watchRecentInvoices({int limit = 5}) {
+    final query = _db.select(_db.invoices).join([
+      innerJoin(_db.clients, _db.clients.id.equalsExp(_db.invoices.clientId)),
+    ]);
+    query.orderBy([
+      OrderingTerm(expression: _db.invoices.issueDate, mode: OrderingMode.desc),
+      OrderingTerm(expression: _db.invoices.id, mode: OrderingMode.desc),
+    ]);
+    query.limit(limit);
+
+    return query.watch().map((rows) {
+      return rows.map((row) {
+        final invoice = row.readTable(_db.invoices);
+        final client = row.readTable(_db.clients);
+        return DashboardInvoiceItem(
+          invoice: invoice,
+          clientName: client.name,
+          clientCurrency: client.accountCurrency,
+        );
+      }).toList();
+    });
+  }
+
+  /// الفواتير المتأخرة عن موعد استحقاقها
+  Stream<List<DashboardInvoiceItem>> watchOverdueInvoices({int limit = 5}) {
+    final now = DateTime.now();
+    final query = _db.select(_db.invoices).join([
+      innerJoin(_db.clients, _db.clients.id.equalsExp(_db.invoices.clientId)),
+    ]);
+    query.where(
+      _db.invoices.dueDate.isNotNull() &
+      _db.invoices.dueDate.isSmallerThanValue(now) &
+      _db.invoices.status.equals(InvoiceStatus.paid.index).not() &
+      _db.invoices.status.equals(InvoiceStatus.cancelled.index).not(),
+    );
+    query.orderBy([
+      OrderingTerm(expression: _db.invoices.dueDate, mode: OrderingMode.asc),
+    ]);
+    query.limit(limit);
+
+    return query.watch().map((rows) {
+      return rows.map((row) {
+        final invoice = row.readTable(_db.invoices);
+        final client = row.readTable(_db.clients);
+        return DashboardInvoiceItem(
+          invoice: invoice,
+          clientName: client.name,
+          clientCurrency: client.accountCurrency,
+        );
+      }).toList();
+    });
+  }
+}
+
+/// عنصر فاتورة للوحة المعلومات مع اسم وعملة العميل.
+class DashboardInvoiceItem {
+  final Invoice invoice;
+  final String clientName;
+  final String clientCurrency;
+
+  const DashboardInvoiceItem({
+    required this.invoice,
+    required this.clientName,
+    required this.clientCurrency,
+  });
 }
 
 final dashboardRepositoryProvider = Provider<DashboardRepository>(
@@ -189,3 +256,11 @@ final dashboardRepositoryProvider = Provider<DashboardRepository>(
 final dashboardStatsProvider = StreamProvider<DashboardStats>(
   (ref) => ref.watch(dashboardRepositoryProvider).watchStats(),
 );
+
+final recentInvoicesProvider = StreamProvider<List<DashboardInvoiceItem>>((ref) {
+  return ref.watch(dashboardRepositoryProvider).watchRecentInvoices();
+});
+
+final overdueInvoicesProvider = StreamProvider<List<DashboardInvoiceItem>>((ref) {
+  return ref.watch(dashboardRepositoryProvider).watchOverdueInvoices();
+});

@@ -196,58 +196,94 @@ class InvoicesScreen extends ConsumerWidget {
                           final statusColor = _getStatusColor(invoice.status);
 
                           return Card(
-                            elevation: 1,
+                            elevation: 0.8,
+                            margin: const EdgeInsets.only(bottom: 10),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(color: AppColors.line.withValues(alpha: 0.5)),
+                              borderRadius: BorderRadius.circular(14),
+                              side: BorderSide(
+                                color: isOverdueValue
+                                    ? Colors.red.shade200
+                                    : AppColors.line.withValues(alpha: 0.6),
+                              ),
                             ),
                             child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
                               onTap: () {
                                 context.go('/invoices/${invoice.id}');
                               },
                               child: Padding(
-                                padding: const EdgeInsets.all(16),
+                                padding: const EdgeInsets.all(14.0),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(
-                                          invoice.number,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                            color: AppColors.accent,
-                                          ),
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(7),
+                                              decoration: BoxDecoration(
+                                                color: statusColor.withValues(alpha: 0.12),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Icon(
+                                                Icons.receipt_rounded,
+                                                size: 18,
+                                                color: statusColor,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Text(
+                                              invoice.number,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                                color: AppColors.accent,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                         Text(
                                           formatMoney(invoice.totalMinor, invoice.currency),
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 16,
+                                            color: AppColors.dark,
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 8),
+                                    const SizedBox(height: 10),
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(
-                                          clientName,
-                                          style: const TextStyle(
-                                            color: AppColors.dark,
-                                            fontSize: 14,
-                                          ),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.person_outline, size: 15, color: AppColors.muted),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              clientName,
+                                              style: const TextStyle(
+                                                color: AppColors.dark,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        Text(
-                                          _formatDate(invoice.issueDate),
-                                          style: const TextStyle(
-                                            color: AppColors.muted,
-                                            fontSize: 12,
-                                          ),
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.calendar_today_outlined, size: 13, color: AppColors.muted),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              _formatDate(invoice.issueDate),
+                                              style: const TextStyle(
+                                                color: AppColors.muted,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ],
                                     ),
@@ -260,30 +296,38 @@ class InvoicesScreen extends ConsumerWidget {
                                           decoration: BoxDecoration(
                                             color: statusColor.withValues(alpha: 0.1),
                                             borderRadius: BorderRadius.circular(6),
+                                            border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                                           ),
                                           child: Text(
                                             _getStatusLabel(invoice.status),
                                             style: TextStyle(
                                               color: statusColor,
-                                              fontSize: 12,
+                                              fontSize: 11,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
                                         ),
                                         if (isOverdueValue)
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                             decoration: BoxDecoration(
-                                              color: Colors.red.withValues(alpha: 0.1),
+                                              color: Colors.red.shade50,
                                               borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: Colors.red.shade200),
                                             ),
-                                            child: const Text(
-                                              'متأخرة',
-                                              style: TextStyle(
-                                                color: Colors.red,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                              ),
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.warning_amber_rounded, size: 13, color: Colors.red.shade700),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  'متأخرة عن موعدها',
+                                                  style: TextStyle(
+                                                    color: Colors.red.shade700,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                       ],
@@ -302,13 +346,18 @@ class InvoicesScreen extends ConsumerWidget {
             ),
           ],
         ),
-        floatingActionButton: FloatingActionButton(
+        floatingActionButton: FloatingActionButton.extended(
           backgroundColor: AppColors.accent,
           foregroundColor: Colors.white,
+          elevation: 2,
+          icon: const Icon(Icons.post_add_rounded),
+          label: const Text(
+            'فاتورة جديدة',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           onPressed: () {
             context.go('/invoices/new');
           },
-          child: const Icon(Icons.add),
         ),
       ),
     );
