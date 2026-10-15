@@ -59,6 +59,8 @@ class InvoiceDetailScreen extends ConsumerWidget {
                 onSelected: (value) async {
                   if (value == 'edit') {
                     context.push('/invoices/${invoice.id}/edit');
+                  } else if (value == 'revert_to_draft') {
+                    await _handleRevertToDraft(context, ref, invoice);
                   } else if (value == 'send') {
                     await _changeInvoiceStatus(
                       context,
@@ -192,6 +194,18 @@ class InvoiceDetailScreen extends ConsumerWidget {
                       ),
                     ),
                   ],
+                  if (invoice.status != InvoiceStatus.draft &&
+                      invoice.status != InvoiceStatus.cancelled)
+                    const PopupMenuItem(
+                      value: 'revert_to_draft',
+                      child: Row(
+                        children: [
+                          Icon(Icons.history_rounded, color: Colors.orange, size: 18),
+                          SizedBox(width: 8),
+                          Text('إعادة إلى مسودة للتعديل'),
+                        ],
+                      ),
+                    ),
                   if (invoice.status != InvoiceStatus.cancelled &&
                       invoice.status != InvoiceStatus.paid)
                     const PopupMenuItem(
@@ -835,21 +849,42 @@ class InvoiceDetailScreen extends ConsumerWidget {
                           invoice.status != InvoiceStatus.cancelled &&
                           invoice.status != InvoiceStatus.paid) ...[
                         const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade700,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green.shade700,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.add_card),
+                                label: const Text('تسجيل تحصيل', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                                onPressed: () => context.push('/invoices/${invoice.id}/pay'),
                               ),
                             ),
-                            icon: const Icon(Icons.add_card),
-                            label: const Text('تسجيل تحصيل', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                            onPressed: () => context.push('/invoices/${invoice.id}/pay'),
-                          ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 2,
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.orange.shade800,
+                                  side: BorderSide(color: Colors.orange.shade400),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                icon: const Icon(Icons.history_rounded, size: 18),
+                                label: const Text('إعادة لمسودة', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                onPressed: () => _handleRevertToDraft(context, ref, invoice),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ],
@@ -1021,5 +1056,102 @@ class InvoiceDetailScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _handleRevertToDraft(BuildContext context, WidgetRef ref, Invoice invoice) async {
+    final payments = await (ref.read(databaseProvider).select(ref.read(databaseProvider).payments)
+          ..where((p) => p.invoiceId.equals(invoice.id)))
+        .get();
+
+    if (payments.isNotEmpty) {
+      final totalPaid = payments.fold<int>(0, (s, p) => s + p.amountMinor);
+      if (context.mounted) {
+        await showDialog(
+          context: context,
+          builder: (ctx) => Directionality(
+            textDirection: TextDirection.rtl,
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Row(
+                children: [
+                  Icon(Icons.shield_outlined, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('تعذّر إعادة الفاتورة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                ],
+              ),
+              content: Text(
+                'توجد ${payments.length} دفعات محصلة مسجلة على هذه الفاتورة بإجمالي ${formatMoney(totalPaid, invoice.currency)}.\n\nلحماية سلامة الحسابات والسجلات المالية، لا يمكن إعادة فاتورة مسددة جزئياً أو كلياً إلى مسودة دون تسوية أو حذف الدفعات المرتبطة بها أولاً.',
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.accent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('حسناً، فهمت'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (!context.mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.history_rounded, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('إعادة الفاتورة إلى مسودة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+            ],
+          ),
+          content: Text(
+            'سيتم تحويل الفاتورة رقم ${invoice.number} من معتمدة إلى "مسودة" لتتمكن من تعديل بنودها وأسعارها وتفاصيلها بحرية.\n\nتنبيه: لن تُحتسب الفاتورة ضمن مديونية العميل أثناء وجودها كمسودة حتى تقوم باعتمادها مجدداً.\n\nهل ترغب في المتابعة؟',
+            style: const TextStyle(fontSize: 14, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('تراجع', style: TextStyle(color: AppColors.muted)),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade800,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.edit, size: 16),
+              label: const Text('نعم، إعادة وتعديل'),
+              onPressed: () => Navigator.of(ctx).pop(true),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      await _changeInvoiceStatus(
+        context,
+        ref,
+        invoice.id,
+        invoice.clientId,
+        InvoiceStatus.draft,
+        'تمت إعادة الفاتورة إلى مسودة بنجاح',
+      );
+      if (context.mounted) {
+        context.push('/invoices/${invoice.id}/edit');
+      }
+    }
   }
 }

@@ -472,6 +472,10 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       }
 
       if (invoice.status != InvoiceStatus.draft) {
+        final paymentsAsync = ref.watch(invoicePaymentsProvider(widget.invoiceId!));
+        final payments = paymentsAsync.value ?? [];
+        final hasPayments = payments.isNotEmpty;
+
         return Directionality(
           textDirection: TextDirection.rtl,
           child: Scaffold(
@@ -482,20 +486,89 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.lock_outline, size: 64, color: Colors.orange),
+                    Icon(
+                      hasPayments ? Icons.lock_outline : Icons.history_rounded,
+                      size: 64,
+                      color: hasPayments ? Colors.red : Colors.orange,
+                    ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'لا يمكن تعديل هذه الفاتورة',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    Text(
+                      hasPayments ? 'لا يمكن تعديل هذه الفاتورة' : 'الفاتورة معتمدة وليست مسودة',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'التعديل متاح فقط للفواتير التي لا تزال في حالة مسودة.',
+                    Text(
+                      hasPayments
+                          ? 'توجد ${payments.length} دفعات مسجلة على هذه الفاتورة. لحماية القيود المالية لا يمكن تعديلها أو إعادتها لمسودة قبل تسوية دفعاتها.'
+                          : 'التعديل المباشر متاح للفواتير المسودة فقط.\nيمكنك إعادة هذه الفاتورة إلى حالة "مسودة" للبدء في تعديل بنودها ومبالغها.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.muted),
+                      style: const TextStyle(color: AppColors.muted, height: 1.4),
                     ),
                     const SizedBox(height: 24),
-                    ElevatedButton(
+                    if (!hasPayments) ...[
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange.shade800,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.replay_rounded),
+                        label: const Text('إعادة إلى مسودة والبدء في التعديل'),
+                        onPressed: () async {
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => Directionality(
+                              textDirection: TextDirection.rtl,
+                              child: AlertDialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                title: const Row(
+                                  children: [
+                                    Icon(Icons.history_rounded, color: Colors.orange),
+                                    SizedBox(width: 8),
+                                    Text('إعادة الفاتورة إلى مسودة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                                  ],
+                                ),
+                                content: Text(
+                                  'سيتم تحويل الفاتورة رقم ${invoice.number} إلى "مسودة" لتتمكن من تعديلها.\n\nتنبيه: لن تُحتسب الفاتورة ضمن مديونية العميل حتى يعاد اعتمادها.\n\nهل ترغب في المتابعة؟',
+                                  style: const TextStyle(fontSize: 14, height: 1.4),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(ctx).pop(false),
+                                    child: const Text('تراجع', style: TextStyle(color: AppColors.muted)),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.orange.shade800,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    onPressed: () => Navigator.of(ctx).pop(true),
+                                    child: const Text('نعم، إعادة وتعديل'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+
+                          if (confirmed == true && context.mounted) {
+                            final repo = ref.read(invoiceRepositoryProvider);
+                            await repo.updateInvoiceStatus(invoice.id, InvoiceStatus.draft);
+                            ref.invalidate(invoiceByIdProvider(invoice.id));
+                            ref.invalidate(invoiceRemainingProvider(invoice.id));
+                            ref.invalidate(invoicesListProvider);
+                            ref.invalidate(clientInvoicesProvider(invoice.clientId));
+                            ref.invalidate(clientBalanceProvider(invoice.clientId));
+                            if (context.mounted) {
+                              AppSnackBar.showSuccess(context, 'تمت إعادة الفاتورة إلى مسودة، يمكنك التعديل الآن');
+                            }
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    OutlinedButton(
                       onPressed: () => Navigator.of(context).pop(),
                       child: const Text('العودة'),
                     ),
