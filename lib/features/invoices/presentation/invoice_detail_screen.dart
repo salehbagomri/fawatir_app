@@ -15,48 +15,17 @@ import 'package:fawatir/data/db/database.dart';
 import 'package:fawatir/shared/pdf/invoice_pdf.dart';
 import 'package:fawatir/shared/pdf/receipt_pdf.dart';
 import 'package:fawatir/shared/widgets/app_snackbar.dart';
+import 'package:fawatir/shared/widgets/confirm_dialog.dart';
+import 'package:fawatir/core/invoice_status_utils.dart';
+import 'package:fawatir/core/date_utils.dart';
 
 class InvoiceDetailScreen extends ConsumerWidget {
   final int invoiceId;
   const InvoiceDetailScreen({super.key, required this.invoiceId});
 
-  Color _getStatusColor(InvoiceStatus status) {
-    switch (status) {
-      case InvoiceStatus.draft:
-        return Colors.grey;
-      case InvoiceStatus.sent:
-        return Colors.blue;
-      case InvoiceStatus.paid:
-        return Colors.green;
-      case InvoiceStatus.partiallyPaid:
-        return Colors.orange;
-      case InvoiceStatus.overdue:
-        return Colors.red;
-      case InvoiceStatus.cancelled:
-        return Colors.grey.shade600;
-    }
-  }
-
-  String _getStatusLabel(InvoiceStatus status) {
-    switch (status) {
-      case InvoiceStatus.draft:
-        return 'مسودة';
-      case InvoiceStatus.sent:
-        return 'مرسلة';
-      case InvoiceStatus.paid:
-        return 'مدفوعة';
-      case InvoiceStatus.partiallyPaid:
-        return 'مدفوعة جزئياً';
-      case InvoiceStatus.overdue:
-        return 'متأخرة';
-      case InvoiceStatus.cancelled:
-        return 'ملغاة';
-    }
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
-  }
+  Color _getStatusColor(InvoiceStatus status) => invoiceStatusColor(status);
+  String _getStatusLabel(InvoiceStatus status) => invoiceStatusLabel(status);
+  String _formatDate(DateTime date) => formatDate(date);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -157,6 +126,27 @@ class InvoiceDetailScreen extends ConsumerWidget {
                     }
                   } else if (value == 'duplicate') {
                     context.push('/invoices/new', extra: invoice.id);
+                  } else if (value == 'delete') {
+                    final confirmed = await showConfirmDialog(
+                      context,
+                      title: 'حذف الفاتورة المسودة',
+                      message: 'هل أنت متأكد من رغبتك في حذف هذه الفاتورة المسودة نهائياً؟ لن يمكن استرجاع هذه الفاتورة أو بنودها بعد الحذف.',
+                      confirmLabel: 'نعم، حذف نهائي',
+                      cancelLabel: 'تراجع',
+                      isDestructive: true,
+                      icon: Icons.delete_forever_rounded,
+                    );
+                    if (confirmed == true && context.mounted) {
+                      final repo = ref.read(invoiceRepositoryProvider);
+                      await repo.deleteInvoice(invoice.id);
+                      ref.invalidate(invoicesListProvider);
+                      ref.invalidate(clientInvoicesProvider(invoice.clientId));
+                      ref.invalidate(clientBalanceProvider(invoice.clientId));
+                      if (context.mounted) {
+                        AppSnackBar.showSuccess(context, 'تم حذف الفاتورة المسودة بنجاح');
+                        context.go('/invoices');
+                      }
+                    }
                   }
                 },
                 itemBuilder: (context) => [
@@ -188,6 +178,16 @@ class InvoiceDetailScreen extends ConsumerWidget {
                           Icon(Icons.send, color: Colors.blue, size: 18),
                           SizedBox(width: 8),
                           Text('اعتماد وإرسال الفاتورة'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_forever_rounded, color: Colors.red, size: 18),
+                          SizedBox(width: 8),
+                          Text('حذف المسودة نهائياً', style: TextStyle(color: Colors.red)),
                         ],
                       ),
                     ),
@@ -310,6 +310,8 @@ class InvoiceDetailScreen extends ConsumerWidget {
                                 'تاريخ الاستحقاق:',
                                 invoice.dueDate != null ? _formatDate(invoice.dueDate!) : 'غير محدد',
                               ),
+                              const SizedBox(height: 8),
+                              _buildInfoRow('تاريخ الإنشاء في النظام:', formatDateTime(invoice.createdAt)),
                               const SizedBox(height: 8),
                               _buildInfoRow('العملة:', '${invoice.currency} (${symbolFor(invoice.currency)})'),
                               if (showFxRate) ...[
@@ -461,6 +463,58 @@ class InvoiceDetailScreen extends ConsumerWidget {
                           padding: const EdgeInsets.all(16.0),
                           child: Column(
                             children: [
+                              if (invoice.discountMinor > 0 || invoice.taxMinor > 0) ...[
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text('المجموع الفرعي:', style: TextStyle(fontSize: 14, color: AppColors.muted)),
+                                    Text(
+                                      formatMoney(
+                                        (invoice.totalMinor - invoice.taxMinor + invoice.discountMinor),
+                                        invoice.currency,
+                                      ),
+                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                                if (invoice.discountMinor > 0) ...[
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        invoice.discountPercent > 0
+                                            ? 'الخصم (${invoice.discountPercent.toStringAsFixed(invoice.discountPercent.truncateToDouble() == invoice.discountPercent ? 0 : 1)}%):'
+                                            : 'الخصم:',
+                                        style: const TextStyle(fontSize: 14, color: Colors.red),
+                                      ),
+                                      Text(
+                                        '- ${formatMoney(invoice.discountMinor, invoice.currency)}',
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.red),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                if (invoice.taxMinor > 0) ...[
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        invoice.taxPercent > 0
+                                            ? 'الضريبة (${invoice.taxPercent.toStringAsFixed(invoice.taxPercent.truncateToDouble() == invoice.taxPercent ? 0 : 1)}%):'
+                                            : 'الضريبة:',
+                                        style: const TextStyle(fontSize: 14, color: AppColors.muted),
+                                      ),
+                                      Text(
+                                        '+ ${formatMoney(invoice.taxMinor, invoice.currency)}',
+                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                const Divider(height: 16),
+                              ],
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
@@ -476,42 +530,112 @@ class InvoiceDetailScreen extends ConsumerWidget {
                               ),
                               remainingAsync.maybeWhen(
                                 data: (remaining) {
-                                  if (remaining < invoice.totalMinor) {
-                                    final paid = invoice.totalMinor - remaining;
-                                    return Column(
-                                      children: [
-                                        const Divider(height: 16),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text(
-                                              'المسدد:',
-                                              style: TextStyle(fontSize: 14, color: Colors.green, fontWeight: FontWeight.bold),
+                                  final paid = (invoice.totalMinor - remaining).clamp(0, invoice.totalMinor);
+                                  final ratio = invoice.totalMinor > 0 ? (paid / invoice.totalMinor).clamp(0.0, 1.0) : 0.0;
+                                  final percent = (ratio * 100).toInt();
+
+                                  return Column(
+                                    children: [
+                                      const Divider(height: 20),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Row(
+                                            children: [
+                                              Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
+                                              SizedBox(width: 6),
+                                              Text(
+                                                'المسدد:',
+                                                style: TextStyle(fontSize: 14, color: Colors.green, fontWeight: FontWeight.bold),
+                                              ),
+                                            ],
+                                          ),
+                                          Text(
+                                            formatMoney(paid, invoice.currency),
+                                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                remaining > 0 ? Icons.timelapse_rounded : Icons.task_alt_rounded,
+                                                size: 16,
+                                                color: remaining > 0 ? Colors.red.shade700 : Colors.green.shade700,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'المتبقي:',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: remaining > 0 ? Colors.red.shade700 : Colors.green.shade700,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Text(
+                                            formatMoney(remaining, invoice.currency),
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                              color: remaining > 0 ? Colors.red.shade700 : Colors.green.shade700,
                                             ),
-                                            Text(
-                                              formatMoney(paid, invoice.currency),
-                                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.green),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+                                      // Progress bar
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                remaining == 0
+                                                    ? 'تم سداد الفاتورة بالكامل ✓'
+                                                    : 'نسبة السداد: $percent%',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: remaining == 0 ? Colors.green.shade700 : AppColors.dark,
+                                                ),
+                                              ),
+                                              Text(
+                                                remaining == 0 ? '100%' : '$percent%',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: remaining == 0
+                                                      ? Colors.green.shade700
+                                                      : (percent > 0 ? Colors.orange.shade800 : Colors.grey.shade600),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 6),
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(6),
+                                            child: LinearProgressIndicator(
+                                              value: ratio,
+                                              minHeight: 8,
+                                              backgroundColor: Colors.grey.shade200,
+                                              valueColor: AlwaysStoppedAnimation<Color>(
+                                                remaining == 0
+                                                    ? Colors.green.shade600
+                                                    : (percent > 50 ? Colors.teal : (percent > 0 ? Colors.orange : Colors.grey)),
+                                              ),
                                             ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            const Text(
-                                              'المتبقي:',
-                                              style: TextStyle(fontSize: 14, color: Colors.red, fontWeight: FontWeight.bold),
-                                            ),
-                                            Text(
-                                              formatMoney(remaining, invoice.currency),
-                                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.red),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    );
-                                  }
-                                  return const SizedBox.shrink();
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  );
                                 },
                                 orElse: () => const SizedBox.shrink(),
                               ),

@@ -53,5 +53,9 @@ Future<InvoicePdfData> buildInvoicePdfData(Ref ref, int invoiceId) async {
             ))
         .toList(),
     notes: invoice.notes,
+    discountMinor: invoice.discountMinor,
+    taxMinor: invoice.taxMinor,
+    discountPercent: invoice.discountPercent,
+    taxPercent: invoice.taxPercent,
   );
 }

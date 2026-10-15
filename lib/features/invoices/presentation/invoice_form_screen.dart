@@ -11,6 +11,7 @@ import 'package:fawatir/features/invoices/data/invoice_repository.dart';
 import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/payments/application/payment_providers.dart';
 import 'package:fawatir/shared/widgets/app_snackbar.dart';
+import 'package:fawatir/shared/widgets/confirm_dialog.dart';
 
 class InvoiceItemRow {
   final descriptionController = TextEditingController();
@@ -29,11 +30,13 @@ class InvoiceItemRow {
 class InvoiceFormScreen extends ConsumerStatefulWidget {
   final int? invoiceId;
   final int? duplicateFromInvoiceId;
+  final int? initialClientId;
 
   const InvoiceFormScreen({
     super.key,
     this.invoiceId,
     this.duplicateFromInvoiceId,
+    this.initialClientId,
   });
 
   @override
@@ -49,14 +52,33 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   String _invoiceCurrency = 'USD';
   final _fxRateController = TextEditingController(text: '1.0');
   final _notesController = TextEditingController();
+  final _discountController = TextEditingController();
+  bool _isDiscountPercent = false;
+  final _taxPercentController = TextEditingController();
 
   final List<InvoiceItemRow> _itemRows = [];
   bool _isSaving = false;
   bool _isInitialized = false;
+  bool _canExitWithoutConfirm = false;
+
+  bool get _hasUnsavedChanges {
+    if (_canExitWithoutConfirm) return false;
+    if (_selectedClient != null) return true;
+    if (_notesController.text.trim().isNotEmpty) return true;
+    if (_discountController.text.trim().isNotEmpty) return true;
+    if (_taxPercentController.text.trim().isNotEmpty) return true;
+    for (final row in _itemRows) {
+      if (row.descriptionController.text.trim().isNotEmpty) return true;
+      if (row.priceController.text.trim().isNotEmpty) return true;
+    }
+    return false;
+  }
 
   @override
   void initState() {
     super.initState();
+    _discountController.addListener(_onItemChanged);
+    _taxPercentController.addListener(_onItemChanged);
     if (widget.invoiceId == null && widget.duplicateFromInvoiceId == null) {
       _addItemRow(); // Start with one item row by default for new invoices
     }
@@ -83,6 +105,22 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     _fxRateController.text = invoice.fxRateToAccount.toString();
     _notesController.text = invoice.notes ?? '';
 
+    if (invoice.discountPercent > 0) {
+      _isDiscountPercent = true;
+      _discountController.text = invoice.discountPercent.toString();
+    } else if (invoice.discountMinor > 0) {
+      _isDiscountPercent = false;
+      _discountController.text = (invoice.discountMinor / 100.0).toStringAsFixed(2);
+    } else {
+      _discountController.text = '';
+    }
+
+    if (invoice.taxPercent > 0) {
+      _taxPercentController.text = invoice.taxPercent.toString();
+    } else {
+      _taxPercentController.text = '';
+    }
+
     for (final r in _itemRows) {
       r.dispose();
     }
@@ -107,6 +145,10 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
 
   @override
   void dispose() {
+    _discountController.removeListener(_onItemChanged);
+    _taxPercentController.removeListener(_onItemChanged);
+    _discountController.dispose();
+    _taxPercentController.dispose();
     for (final row in _itemRows) {
       row.dispose();
     }
@@ -138,7 +180,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     setState(() {}); // Recalculate totals
   }
 
-  int get _totalMinor {
+  int get _subtotalMinor {
     int total = 0;
     for (final row in _itemRows) {
       final qty = double.tryParse(row.qtyController.text.trim()) ?? 0.0;
@@ -147,6 +189,34 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       total += (qty * priceMinor).round();
     }
     return total;
+  }
+
+  int get _discountMinor {
+    final text = _discountController.text.trim();
+    if (text.isEmpty) return 0;
+    if (_isDiscountPercent) {
+      final percent = double.tryParse(text) ?? 0.0;
+      if (percent <= 0) return 0;
+      final val = (_subtotalMinor * percent / 100).round();
+      return val > _subtotalMinor ? _subtotalMinor : val;
+    } else {
+      final minor = parseToMinor(text);
+      return minor > _subtotalMinor ? _subtotalMinor : minor;
+    }
+  }
+
+  int get _taxMinor {
+    final text = _taxPercentController.text.trim();
+    if (text.isEmpty) return 0;
+    final percent = double.tryParse(text) ?? 0.0;
+    if (percent <= 0) return 0;
+    final net = (_subtotalMinor - _discountMinor).clamp(0, double.infinity).toInt();
+    return (net * percent / 100).round();
+  }
+
+  int get _totalMinor {
+    final net = (_subtotalMinor - _discountMinor).clamp(0, double.infinity).toInt();
+    return net + _taxMinor;
   }
 
   Future<void> _selectIssueDate() async {
@@ -177,7 +247,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     }
   }
 
-  Future<void> _saveInvoice() async {
+  Future<void> _saveInvoice({required InvoiceStatus targetStatus}) async {
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedClient == null) {
@@ -242,6 +312,18 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       return;
     }
 
+    if (targetStatus == InvoiceStatus.sent) {
+      final confirmed = await showConfirmDialog(
+        context,
+        title: 'اعتماد الفاتورة',
+        message: 'سيتم اعتماد الفاتورة وتغيير حالتها إلى "مرسلة"، ولن يمكن تعديل بياناتها أو بنودها بعد ذلك. هل أنت متأكد من الاعتماد؟',
+        confirmLabel: 'نعم، اعتماد الفاتورة',
+        cancelLabel: 'تراجع',
+        icon: Icons.send_rounded,
+      );
+      if (confirmed != true) return;
+    }
+
     setState(() {
       _isSaving = true;
     });
@@ -269,15 +351,22 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         final existingInvoice = ref.read(invoiceByIdProvider(widget.invoiceId!)).value;
         final number = existingInvoice?.number ?? '';
 
+        final discountVal = double.tryParse(_discountController.text.trim()) ?? 0.0;
+        final taxVal = double.tryParse(_taxPercentController.text.trim()) ?? 0.0;
+
         final invoiceCompanion = InvoicesCompanion(
           id: Value(widget.invoiceId!),
           number: Value(number),
           clientId: Value(_selectedClient!.id),
           issueDate: Value(_issueDate),
           dueDate: Value(_dueDate),
-          status: const Value(InvoiceStatus.draft),
+          status: Value(targetStatus),
           currency: Value(_invoiceCurrency),
           fxRateToAccount: Value(fxRate),
+          discountMinor: Value(_discountMinor),
+          discountPercent: Value(_isDiscountPercent ? discountVal : 0.0),
+          taxMinor: Value(_taxMinor),
+          taxPercent: Value(taxVal),
           notes: Value(_notesController.text.trim().isEmpty ? null : _notesController.text.trim()),
         );
 
@@ -293,20 +382,30 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         }
 
         if (mounted) {
-          AppSnackBar.showSuccess(context, 'تم تعديل الفاتورة رقم $number بنجاح');
+          final msg = targetStatus == InvoiceStatus.sent
+              ? 'تم اعتماد وإصدار الفاتورة رقم $number بنجاح'
+              : 'تم حفظ تعديلات الفاتورة رقم $number بنجاح';
+          AppSnackBar.showSuccess(context, msg);
+          _canExitWithoutConfirm = true;
           Navigator.of(context).pop();
         }
       } else {
         final number = await repo.nextInvoiceNumber();
+        final discountVal = double.tryParse(_discountController.text.trim()) ?? 0.0;
+        final taxVal = double.tryParse(_taxPercentController.text.trim()) ?? 0.0;
 
         final invoice = InvoicesCompanion.insert(
           number: number,
           clientId: _selectedClient!.id,
           issueDate: _issueDate,
           dueDate: Value(_dueDate),
-          status: const Value(InvoiceStatus.sent),
+          status: Value(targetStatus),
           currency: _invoiceCurrency,
           fxRateToAccount: Value(fxRate),
+          discountMinor: Value(_discountMinor),
+          discountPercent: Value(_isDiscountPercent ? discountVal : 0.0),
+          taxMinor: Value(_taxMinor),
+          taxPercent: Value(taxVal),
           notes: Value(_notesController.text.trim().isEmpty ? null : _notesController.text.trim()),
         );
 
@@ -319,7 +418,11 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         }
 
         if (mounted) {
-          AppSnackBar.showSuccess(context, 'تم إنشاء الفاتورة رقم $number بنجاح');
+          final msg = targetStatus == InvoiceStatus.sent
+              ? 'تم إنشاء واعتماد الفاتورة رقم $number بنجاح'
+              : 'تم حفظ الفاتورة رقم $number كمسودة بنجاح';
+          AppSnackBar.showSuccess(context, msg);
+          _canExitWithoutConfirm = true;
           Navigator.of(context).pop();
         }
       }
@@ -432,27 +535,41 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
 
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
+      child: PopScope(
+        canPop: !_hasUnsavedChanges,
+        onPopInvokedWithResult: (didPop, result) async {
+          if (didPop) return;
+          final shouldLeave = await showConfirmDialog(
+            context,
+            title: 'مغادرة النموذج؟',
+            message: 'لديك بيانات غير محفوظة في الفاتورة. هل أنت متأكد من رغبتك في المغادرة وإلغاء البيانات المدخلة؟',
+            confirmLabel: 'نعم، مغادرة',
+            cancelLabel: 'البقاء ومتابعة التحرير',
+            isDestructive: true,
+            icon: Icons.warning_amber_rounded,
+          );
+          if (shouldLeave == true && context.mounted) {
+            _canExitWithoutConfirm = true;
+            Navigator.of(context).pop();
+          }
+        },
+        child: Scaffold(
         appBar: AppBar(
           title: Text(isEditing
               ? 'تعديل الفاتورة'
               : (isDuplicating ? 'نسخ الفاتورة (مسودة جديدة)' : 'إنشاء فاتورة جديدة')),
           actions: [
-            _isSaving
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Center(
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
-                      ),
-                    ),
-                  )
-                : IconButton(
-                    icon: const Icon(Icons.check),
-                    onPressed: _saveInvoice,
+            if (_isSaving)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accent),
                   ),
+                ),
+              ),
           ],
         ),
         body: Form(
@@ -481,6 +598,14 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                           if (_selectedClient != null) {
                             try {
                               currentClient = clients.firstWhere((c) => c.id == _selectedClient!.id);
+                            } catch (_) {
+                              currentClient = null;
+                            }
+                          } else if (widget.initialClientId != null && !isEditing && !isDuplicating) {
+                            try {
+                              currentClient = clients.firstWhere((c) => c.id == widget.initialClientId);
+                              _selectedClient = currentClient;
+                              _invoiceCurrency = currentClient.accountCurrency;
                             } catch (_) {
                               currentClient = null;
                             }
@@ -792,23 +917,161 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                   );
                 },
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // Discount and Tax Card
+              Card(
+                elevation: 1,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.tune, size: 20, color: AppColors.accent),
+                          SizedBox(width: 8),
+                          Text(
+                            'الخصم والضريبة',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.accent),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Discount row
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: TextFormField(
+                              controller: _discountController,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              decoration: InputDecoration(
+                                labelText: _isDiscountPercent ? 'نسبة الخصم (%)' : 'مبلغ الخصم ($_invoiceCurrency)',
+                                border: const OutlineInputBorder(),
+                                prefixIcon: const Icon(Icons.discount_outlined),
+                                hintText: _isDiscountPercent ? 'مثال: 10' : 'مثال: 50.00',
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: SegmentedButton<bool>(
+                              segments: const [
+                                ButtonSegment<bool>(
+                                  value: false,
+                                  label: Text('مبلغ'),
+                                ),
+                                ButtonSegment<bool>(
+                                  value: true,
+                                  label: Text('%'),
+                                ),
+                              ],
+                              selected: {_isDiscountPercent},
+                              onSelectionChanged: (val) {
+                                setState(() {
+                                  _isDiscountPercent = val.first;
+                                });
+                              },
+                              style: const ButtonStyle(
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Tax row
+                      TextFormField(
+                        controller: _taxPercentController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(
+                          labelText: 'نسبة ضريبة القيمة المضافة (%)',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.receipt_long_outlined),
+                          hintText: 'مثال: 15 (0 تعني بدون ضريبة)',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
 
               // Grand Total Card
               Card(
                 color: AppColors.accent.withValues(alpha: 0.05),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: AppColors.accent.withValues(alpha: 0.15)),
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                  child: Column(
                     children: [
-                      const Text(
-                        'إجمالي الفاتورة:',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.accent),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'المجموع الفرعي:',
+                            style: TextStyle(fontSize: 15, color: AppColors.muted),
+                          ),
+                          Text(
+                            formatMoney(_subtotalMinor, _invoiceCurrency),
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
-                      Text(
-                        formatMoney(_totalMinor, _invoiceCurrency),
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.accent),
+                      if (_discountMinor > 0) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _isDiscountPercent
+                                  ? 'الخصم (${_discountController.text.trim()}%):'
+                                  : 'الخصم:',
+                              style: const TextStyle(fontSize: 14, color: Colors.red),
+                            ),
+                            Text(
+                              '- ${formatMoney(_discountMinor, _invoiceCurrency)}',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.red),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (_taxMinor > 0) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'الضريبة (${_taxPercentController.text.trim()}%):',
+                              style: const TextStyle(fontSize: 14, color: AppColors.muted),
+                            ),
+                            Text(
+                              '+ ${formatMoney(_taxMinor, _invoiceCurrency)}',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ],
+                      const Divider(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'إجمالي الفاتورة:',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.accent),
+                          ),
+                          Text(
+                            formatMoney(_totalMinor, _invoiceCurrency),
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.accent),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -827,11 +1090,81 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                   prefixIcon: Icon(Icons.note),
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
             ],
           ),
         ),
+        bottomNavigationBar: SafeArea(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  offset: const Offset(0, -2),
+                  blurRadius: 6,
+                ),
+              ],
+              border: Border(
+                top: BorderSide(
+                  color: Colors.grey.withValues(alpha: 0.2),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isSaving ? null : () => _saveInvoice(targetStatus: InvoiceStatus.draft),
+                    icon: const Icon(Icons.drafts_outlined, size: 20),
+                    label: const Text(
+                      'حفظ كمسودة',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      foregroundColor: AppColors.accent,
+                      side: const BorderSide(color: AppColors.accent),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _isSaving ? null : () => _saveInvoice(targetStatus: InvoiceStatus.sent),
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.send_rounded, size: 20),
+                    label: Text(
+                      isEditing ? 'حفظ واعتماد' : 'حفظ واعتماد',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
+    ),
     );
   }
 }

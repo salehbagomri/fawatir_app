@@ -118,6 +118,19 @@ class $CompaniesTable extends Companies
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _defaultTaxPercentMeta = const VerificationMeta(
+    'defaultTaxPercent',
+  );
+  @override
+  late final GeneratedColumn<double> defaultTaxPercent =
+      GeneratedColumn<double>(
+        'default_tax_percent',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(0.0),
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -130,6 +143,7 @@ class $CompaniesTable extends Companies
     defaultCurrency,
     invoicePrefix,
     invoiceCounter,
+    defaultTaxPercent,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -214,6 +228,15 @@ class $CompaniesTable extends Companies
         ),
       );
     }
+    if (data.containsKey('default_tax_percent')) {
+      context.handle(
+        _defaultTaxPercentMeta,
+        defaultTaxPercent.isAcceptableOrUnknown(
+          data['default_tax_percent']!,
+          _defaultTaxPercentMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -263,6 +286,10 @@ class $CompaniesTable extends Companies
         DriftSqlType.int,
         data['${effectivePrefix}invoice_counter'],
       )!,
+      defaultTaxPercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}default_tax_percent'],
+      )!,
     );
   }
 
@@ -283,6 +310,7 @@ class Company extends DataClass implements Insertable<Company> {
   final String defaultCurrency;
   final String invoicePrefix;
   final int invoiceCounter;
+  final double defaultTaxPercent;
   const Company({
     required this.id,
     required this.name,
@@ -294,6 +322,7 @@ class Company extends DataClass implements Insertable<Company> {
     required this.defaultCurrency,
     required this.invoicePrefix,
     required this.invoiceCounter,
+    required this.defaultTaxPercent,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -318,6 +347,7 @@ class Company extends DataClass implements Insertable<Company> {
     map['default_currency'] = Variable<String>(defaultCurrency);
     map['invoice_prefix'] = Variable<String>(invoicePrefix);
     map['invoice_counter'] = Variable<int>(invoiceCounter);
+    map['default_tax_percent'] = Variable<double>(defaultTaxPercent);
     return map;
   }
 
@@ -343,6 +373,7 @@ class Company extends DataClass implements Insertable<Company> {
       defaultCurrency: Value(defaultCurrency),
       invoicePrefix: Value(invoicePrefix),
       invoiceCounter: Value(invoiceCounter),
+      defaultTaxPercent: Value(defaultTaxPercent),
     );
   }
 
@@ -362,6 +393,7 @@ class Company extends DataClass implements Insertable<Company> {
       defaultCurrency: serializer.fromJson<String>(json['defaultCurrency']),
       invoicePrefix: serializer.fromJson<String>(json['invoicePrefix']),
       invoiceCounter: serializer.fromJson<int>(json['invoiceCounter']),
+      defaultTaxPercent: serializer.fromJson<double>(json['defaultTaxPercent']),
     );
   }
   @override
@@ -378,6 +410,7 @@ class Company extends DataClass implements Insertable<Company> {
       'defaultCurrency': serializer.toJson<String>(defaultCurrency),
       'invoicePrefix': serializer.toJson<String>(invoicePrefix),
       'invoiceCounter': serializer.toJson<int>(invoiceCounter),
+      'defaultTaxPercent': serializer.toJson<double>(defaultTaxPercent),
     };
   }
 
@@ -392,6 +425,7 @@ class Company extends DataClass implements Insertable<Company> {
     String? defaultCurrency,
     String? invoicePrefix,
     int? invoiceCounter,
+    double? defaultTaxPercent,
   }) => Company(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -403,6 +437,7 @@ class Company extends DataClass implements Insertable<Company> {
     defaultCurrency: defaultCurrency ?? this.defaultCurrency,
     invoicePrefix: invoicePrefix ?? this.invoicePrefix,
     invoiceCounter: invoiceCounter ?? this.invoiceCounter,
+    defaultTaxPercent: defaultTaxPercent ?? this.defaultTaxPercent,
   );
   Company copyWithCompanion(CompaniesCompanion data) {
     return Company(
@@ -424,6 +459,9 @@ class Company extends DataClass implements Insertable<Company> {
       invoiceCounter: data.invoiceCounter.present
           ? data.invoiceCounter.value
           : this.invoiceCounter,
+      defaultTaxPercent: data.defaultTaxPercent.present
+          ? data.defaultTaxPercent.value
+          : this.defaultTaxPercent,
     );
   }
 
@@ -439,7 +477,8 @@ class Company extends DataClass implements Insertable<Company> {
           ..write('bankDetails: $bankDetails, ')
           ..write('defaultCurrency: $defaultCurrency, ')
           ..write('invoicePrefix: $invoicePrefix, ')
-          ..write('invoiceCounter: $invoiceCounter')
+          ..write('invoiceCounter: $invoiceCounter, ')
+          ..write('defaultTaxPercent: $defaultTaxPercent')
           ..write(')'))
         .toString();
   }
@@ -456,6 +495,7 @@ class Company extends DataClass implements Insertable<Company> {
     defaultCurrency,
     invoicePrefix,
     invoiceCounter,
+    defaultTaxPercent,
   );
   @override
   bool operator ==(Object other) =>
@@ -470,7 +510,8 @@ class Company extends DataClass implements Insertable<Company> {
           other.bankDetails == this.bankDetails &&
           other.defaultCurrency == this.defaultCurrency &&
           other.invoicePrefix == this.invoicePrefix &&
-          other.invoiceCounter == this.invoiceCounter);
+          other.invoiceCounter == this.invoiceCounter &&
+          other.defaultTaxPercent == this.defaultTaxPercent);
 }
 
 class CompaniesCompanion extends UpdateCompanion<Company> {
@@ -484,6 +525,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
   final Value<String> defaultCurrency;
   final Value<String> invoicePrefix;
   final Value<int> invoiceCounter;
+  final Value<double> defaultTaxPercent;
   const CompaniesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -495,6 +537,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.defaultCurrency = const Value.absent(),
     this.invoicePrefix = const Value.absent(),
     this.invoiceCounter = const Value.absent(),
+    this.defaultTaxPercent = const Value.absent(),
   });
   CompaniesCompanion.insert({
     this.id = const Value.absent(),
@@ -507,6 +550,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     this.defaultCurrency = const Value.absent(),
     this.invoicePrefix = const Value.absent(),
     this.invoiceCounter = const Value.absent(),
+    this.defaultTaxPercent = const Value.absent(),
   }) : name = Value(name);
   static Insertable<Company> custom({
     Expression<int>? id,
@@ -519,6 +563,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Expression<String>? defaultCurrency,
     Expression<String>? invoicePrefix,
     Expression<int>? invoiceCounter,
+    Expression<double>? defaultTaxPercent,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -531,6 +576,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       if (defaultCurrency != null) 'default_currency': defaultCurrency,
       if (invoicePrefix != null) 'invoice_prefix': invoicePrefix,
       if (invoiceCounter != null) 'invoice_counter': invoiceCounter,
+      if (defaultTaxPercent != null) 'default_tax_percent': defaultTaxPercent,
     });
   }
 
@@ -545,6 +591,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     Value<String>? defaultCurrency,
     Value<String>? invoicePrefix,
     Value<int>? invoiceCounter,
+    Value<double>? defaultTaxPercent,
   }) {
     return CompaniesCompanion(
       id: id ?? this.id,
@@ -557,6 +604,7 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
       defaultCurrency: defaultCurrency ?? this.defaultCurrency,
       invoicePrefix: invoicePrefix ?? this.invoicePrefix,
       invoiceCounter: invoiceCounter ?? this.invoiceCounter,
+      defaultTaxPercent: defaultTaxPercent ?? this.defaultTaxPercent,
     );
   }
 
@@ -593,6 +641,9 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
     if (invoiceCounter.present) {
       map['invoice_counter'] = Variable<int>(invoiceCounter.value);
     }
+    if (defaultTaxPercent.present) {
+      map['default_tax_percent'] = Variable<double>(defaultTaxPercent.value);
+    }
     return map;
   }
 
@@ -608,7 +659,8 @@ class CompaniesCompanion extends UpdateCompanion<Company> {
           ..write('bankDetails: $bankDetails, ')
           ..write('defaultCurrency: $defaultCurrency, ')
           ..write('invoicePrefix: $invoicePrefix, ')
-          ..write('invoiceCounter: $invoiceCounter')
+          ..write('invoiceCounter: $invoiceCounter, ')
+          ..write('defaultTaxPercent: $defaultTaxPercent')
           ..write(')'))
         .toString();
   }
@@ -1901,6 +1953,54 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _discountMinorMeta = const VerificationMeta(
+    'discountMinor',
+  );
+  @override
+  late final GeneratedColumn<int> discountMinor = GeneratedColumn<int>(
+    'discount_minor',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _discountPercentMeta = const VerificationMeta(
+    'discountPercent',
+  );
+  @override
+  late final GeneratedColumn<double> discountPercent = GeneratedColumn<double>(
+    'discount_percent',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0.0),
+  );
+  static const VerificationMeta _taxMinorMeta = const VerificationMeta(
+    'taxMinor',
+  );
+  @override
+  late final GeneratedColumn<int> taxMinor = GeneratedColumn<int>(
+    'tax_minor',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _taxPercentMeta = const VerificationMeta(
+    'taxPercent',
+  );
+  @override
+  late final GeneratedColumn<double> taxPercent = GeneratedColumn<double>(
+    'tax_percent',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0.0),
+  );
   static const VerificationMeta _notesMeta = const VerificationMeta('notes');
   @override
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
@@ -1947,6 +2047,10 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
     currency,
     fxRateToAccount,
     totalMinor,
+    discountMinor,
+    discountPercent,
+    taxMinor,
+    taxPercent,
     notes,
     subscriptionId,
     createdAt,
@@ -2019,6 +2123,36 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         totalMinor.isAcceptableOrUnknown(data['total_minor']!, _totalMinorMeta),
       );
     }
+    if (data.containsKey('discount_minor')) {
+      context.handle(
+        _discountMinorMeta,
+        discountMinor.isAcceptableOrUnknown(
+          data['discount_minor']!,
+          _discountMinorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('discount_percent')) {
+      context.handle(
+        _discountPercentMeta,
+        discountPercent.isAcceptableOrUnknown(
+          data['discount_percent']!,
+          _discountPercentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('tax_minor')) {
+      context.handle(
+        _taxMinorMeta,
+        taxMinor.isAcceptableOrUnknown(data['tax_minor']!, _taxMinorMeta),
+      );
+    }
+    if (data.containsKey('tax_percent')) {
+      context.handle(
+        _taxPercentMeta,
+        taxPercent.isAcceptableOrUnknown(data['tax_percent']!, _taxPercentMeta),
+      );
+    }
     if (data.containsKey('notes')) {
       context.handle(
         _notesMeta,
@@ -2087,6 +2221,22 @@ class $InvoicesTable extends Invoices with TableInfo<$InvoicesTable, Invoice> {
         DriftSqlType.int,
         data['${effectivePrefix}total_minor'],
       )!,
+      discountMinor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}discount_minor'],
+      )!,
+      discountPercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}discount_percent'],
+      )!,
+      taxMinor: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}tax_minor'],
+      )!,
+      taxPercent: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}tax_percent'],
+      )!,
       notes: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
@@ -2121,6 +2271,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
   final String currency;
   final double fxRateToAccount;
   final int totalMinor;
+  final int discountMinor;
+  final double discountPercent;
+  final int taxMinor;
+  final double taxPercent;
   final String? notes;
   final int? subscriptionId;
   final DateTime createdAt;
@@ -2134,6 +2288,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     required this.currency,
     required this.fxRateToAccount,
     required this.totalMinor,
+    required this.discountMinor,
+    required this.discountPercent,
+    required this.taxMinor,
+    required this.taxPercent,
     this.notes,
     this.subscriptionId,
     required this.createdAt,
@@ -2156,6 +2314,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     map['currency'] = Variable<String>(currency);
     map['fx_rate_to_account'] = Variable<double>(fxRateToAccount);
     map['total_minor'] = Variable<int>(totalMinor);
+    map['discount_minor'] = Variable<int>(discountMinor);
+    map['discount_percent'] = Variable<double>(discountPercent);
+    map['tax_minor'] = Variable<int>(taxMinor);
+    map['tax_percent'] = Variable<double>(taxPercent);
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
@@ -2179,6 +2341,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       currency: Value(currency),
       fxRateToAccount: Value(fxRateToAccount),
       totalMinor: Value(totalMinor),
+      discountMinor: Value(discountMinor),
+      discountPercent: Value(discountPercent),
+      taxMinor: Value(taxMinor),
+      taxPercent: Value(taxPercent),
       notes: notes == null && nullToAbsent
           ? const Value.absent()
           : Value(notes),
@@ -2206,6 +2372,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       currency: serializer.fromJson<String>(json['currency']),
       fxRateToAccount: serializer.fromJson<double>(json['fxRateToAccount']),
       totalMinor: serializer.fromJson<int>(json['totalMinor']),
+      discountMinor: serializer.fromJson<int>(json['discountMinor']),
+      discountPercent: serializer.fromJson<double>(json['discountPercent']),
+      taxMinor: serializer.fromJson<int>(json['taxMinor']),
+      taxPercent: serializer.fromJson<double>(json['taxPercent']),
       notes: serializer.fromJson<String?>(json['notes']),
       subscriptionId: serializer.fromJson<int?>(json['subscriptionId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -2226,6 +2396,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       'currency': serializer.toJson<String>(currency),
       'fxRateToAccount': serializer.toJson<double>(fxRateToAccount),
       'totalMinor': serializer.toJson<int>(totalMinor),
+      'discountMinor': serializer.toJson<int>(discountMinor),
+      'discountPercent': serializer.toJson<double>(discountPercent),
+      'taxMinor': serializer.toJson<int>(taxMinor),
+      'taxPercent': serializer.toJson<double>(taxPercent),
       'notes': serializer.toJson<String?>(notes),
       'subscriptionId': serializer.toJson<int?>(subscriptionId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -2242,6 +2416,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     String? currency,
     double? fxRateToAccount,
     int? totalMinor,
+    int? discountMinor,
+    double? discountPercent,
+    int? taxMinor,
+    double? taxPercent,
     Value<String?> notes = const Value.absent(),
     Value<int?> subscriptionId = const Value.absent(),
     DateTime? createdAt,
@@ -2255,6 +2433,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     currency: currency ?? this.currency,
     fxRateToAccount: fxRateToAccount ?? this.fxRateToAccount,
     totalMinor: totalMinor ?? this.totalMinor,
+    discountMinor: discountMinor ?? this.discountMinor,
+    discountPercent: discountPercent ?? this.discountPercent,
+    taxMinor: taxMinor ?? this.taxMinor,
+    taxPercent: taxPercent ?? this.taxPercent,
     notes: notes.present ? notes.value : this.notes,
     subscriptionId: subscriptionId.present
         ? subscriptionId.value
@@ -2276,6 +2458,16 @@ class Invoice extends DataClass implements Insertable<Invoice> {
       totalMinor: data.totalMinor.present
           ? data.totalMinor.value
           : this.totalMinor,
+      discountMinor: data.discountMinor.present
+          ? data.discountMinor.value
+          : this.discountMinor,
+      discountPercent: data.discountPercent.present
+          ? data.discountPercent.value
+          : this.discountPercent,
+      taxMinor: data.taxMinor.present ? data.taxMinor.value : this.taxMinor,
+      taxPercent: data.taxPercent.present
+          ? data.taxPercent.value
+          : this.taxPercent,
       notes: data.notes.present ? data.notes.value : this.notes,
       subscriptionId: data.subscriptionId.present
           ? data.subscriptionId.value
@@ -2296,6 +2488,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           ..write('currency: $currency, ')
           ..write('fxRateToAccount: $fxRateToAccount, ')
           ..write('totalMinor: $totalMinor, ')
+          ..write('discountMinor: $discountMinor, ')
+          ..write('discountPercent: $discountPercent, ')
+          ..write('taxMinor: $taxMinor, ')
+          ..write('taxPercent: $taxPercent, ')
           ..write('notes: $notes, ')
           ..write('subscriptionId: $subscriptionId, ')
           ..write('createdAt: $createdAt')
@@ -2314,6 +2510,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
     currency,
     fxRateToAccount,
     totalMinor,
+    discountMinor,
+    discountPercent,
+    taxMinor,
+    taxPercent,
     notes,
     subscriptionId,
     createdAt,
@@ -2331,6 +2531,10 @@ class Invoice extends DataClass implements Insertable<Invoice> {
           other.currency == this.currency &&
           other.fxRateToAccount == this.fxRateToAccount &&
           other.totalMinor == this.totalMinor &&
+          other.discountMinor == this.discountMinor &&
+          other.discountPercent == this.discountPercent &&
+          other.taxMinor == this.taxMinor &&
+          other.taxPercent == this.taxPercent &&
           other.notes == this.notes &&
           other.subscriptionId == this.subscriptionId &&
           other.createdAt == this.createdAt);
@@ -2346,6 +2550,10 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
   final Value<String> currency;
   final Value<double> fxRateToAccount;
   final Value<int> totalMinor;
+  final Value<int> discountMinor;
+  final Value<double> discountPercent;
+  final Value<int> taxMinor;
+  final Value<double> taxPercent;
   final Value<String?> notes;
   final Value<int?> subscriptionId;
   final Value<DateTime> createdAt;
@@ -2359,6 +2567,10 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     this.currency = const Value.absent(),
     this.fxRateToAccount = const Value.absent(),
     this.totalMinor = const Value.absent(),
+    this.discountMinor = const Value.absent(),
+    this.discountPercent = const Value.absent(),
+    this.taxMinor = const Value.absent(),
+    this.taxPercent = const Value.absent(),
     this.notes = const Value.absent(),
     this.subscriptionId = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2373,6 +2585,10 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     required String currency,
     this.fxRateToAccount = const Value.absent(),
     this.totalMinor = const Value.absent(),
+    this.discountMinor = const Value.absent(),
+    this.discountPercent = const Value.absent(),
+    this.taxMinor = const Value.absent(),
+    this.taxPercent = const Value.absent(),
     this.notes = const Value.absent(),
     this.subscriptionId = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2390,6 +2606,10 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Expression<String>? currency,
     Expression<double>? fxRateToAccount,
     Expression<int>? totalMinor,
+    Expression<int>? discountMinor,
+    Expression<double>? discountPercent,
+    Expression<int>? taxMinor,
+    Expression<double>? taxPercent,
     Expression<String>? notes,
     Expression<int>? subscriptionId,
     Expression<DateTime>? createdAt,
@@ -2404,6 +2624,10 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       if (currency != null) 'currency': currency,
       if (fxRateToAccount != null) 'fx_rate_to_account': fxRateToAccount,
       if (totalMinor != null) 'total_minor': totalMinor,
+      if (discountMinor != null) 'discount_minor': discountMinor,
+      if (discountPercent != null) 'discount_percent': discountPercent,
+      if (taxMinor != null) 'tax_minor': taxMinor,
+      if (taxPercent != null) 'tax_percent': taxPercent,
       if (notes != null) 'notes': notes,
       if (subscriptionId != null) 'subscription_id': subscriptionId,
       if (createdAt != null) 'created_at': createdAt,
@@ -2420,6 +2644,10 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     Value<String>? currency,
     Value<double>? fxRateToAccount,
     Value<int>? totalMinor,
+    Value<int>? discountMinor,
+    Value<double>? discountPercent,
+    Value<int>? taxMinor,
+    Value<double>? taxPercent,
     Value<String?>? notes,
     Value<int?>? subscriptionId,
     Value<DateTime>? createdAt,
@@ -2434,6 +2662,10 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
       currency: currency ?? this.currency,
       fxRateToAccount: fxRateToAccount ?? this.fxRateToAccount,
       totalMinor: totalMinor ?? this.totalMinor,
+      discountMinor: discountMinor ?? this.discountMinor,
+      discountPercent: discountPercent ?? this.discountPercent,
+      taxMinor: taxMinor ?? this.taxMinor,
+      taxPercent: taxPercent ?? this.taxPercent,
       notes: notes ?? this.notes,
       subscriptionId: subscriptionId ?? this.subscriptionId,
       createdAt: createdAt ?? this.createdAt,
@@ -2472,6 +2704,18 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
     if (totalMinor.present) {
       map['total_minor'] = Variable<int>(totalMinor.value);
     }
+    if (discountMinor.present) {
+      map['discount_minor'] = Variable<int>(discountMinor.value);
+    }
+    if (discountPercent.present) {
+      map['discount_percent'] = Variable<double>(discountPercent.value);
+    }
+    if (taxMinor.present) {
+      map['tax_minor'] = Variable<int>(taxMinor.value);
+    }
+    if (taxPercent.present) {
+      map['tax_percent'] = Variable<double>(taxPercent.value);
+    }
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
@@ -2496,6 +2740,10 @@ class InvoicesCompanion extends UpdateCompanion<Invoice> {
           ..write('currency: $currency, ')
           ..write('fxRateToAccount: $fxRateToAccount, ')
           ..write('totalMinor: $totalMinor, ')
+          ..write('discountMinor: $discountMinor, ')
+          ..write('discountPercent: $discountPercent, ')
+          ..write('taxMinor: $taxMinor, ')
+          ..write('taxPercent: $taxPercent, ')
           ..write('notes: $notes, ')
           ..write('subscriptionId: $subscriptionId, ')
           ..write('createdAt: $createdAt')
@@ -3528,6 +3776,7 @@ typedef $$CompaniesTableCreateCompanionBuilder =
       Value<String> defaultCurrency,
       Value<String> invoicePrefix,
       Value<int> invoiceCounter,
+      Value<double> defaultTaxPercent,
     });
 typedef $$CompaniesTableUpdateCompanionBuilder =
     CompaniesCompanion Function({
@@ -3541,6 +3790,7 @@ typedef $$CompaniesTableUpdateCompanionBuilder =
       Value<String> defaultCurrency,
       Value<String> invoicePrefix,
       Value<int> invoiceCounter,
+      Value<double> defaultTaxPercent,
     });
 
 class $$CompaniesTableFilterComposer
@@ -3599,6 +3849,11 @@ class $$CompaniesTableFilterComposer
 
   ColumnFilters<int> get invoiceCounter => $composableBuilder(
     column: $table.invoiceCounter,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get defaultTaxPercent => $composableBuilder(
+    column: $table.defaultTaxPercent,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3661,6 +3916,11 @@ class $$CompaniesTableOrderingComposer
     column: $table.invoiceCounter,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<double> get defaultTaxPercent => $composableBuilder(
+    column: $table.defaultTaxPercent,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$CompaniesTableAnnotationComposer
@@ -3709,6 +3969,11 @@ class $$CompaniesTableAnnotationComposer
     column: $table.invoiceCounter,
     builder: (column) => column,
   );
+
+  GeneratedColumn<double> get defaultTaxPercent => $composableBuilder(
+    column: $table.defaultTaxPercent,
+    builder: (column) => column,
+  );
 }
 
 class $$CompaniesTableTableManager
@@ -3749,6 +4014,7 @@ class $$CompaniesTableTableManager
                 Value<String> defaultCurrency = const Value.absent(),
                 Value<String> invoicePrefix = const Value.absent(),
                 Value<int> invoiceCounter = const Value.absent(),
+                Value<double> defaultTaxPercent = const Value.absent(),
               }) => CompaniesCompanion(
                 id: id,
                 name: name,
@@ -3760,6 +4026,7 @@ class $$CompaniesTableTableManager
                 defaultCurrency: defaultCurrency,
                 invoicePrefix: invoicePrefix,
                 invoiceCounter: invoiceCounter,
+                defaultTaxPercent: defaultTaxPercent,
               ),
           createCompanionCallback:
               ({
@@ -3773,6 +4040,7 @@ class $$CompaniesTableTableManager
                 Value<String> defaultCurrency = const Value.absent(),
                 Value<String> invoicePrefix = const Value.absent(),
                 Value<int> invoiceCounter = const Value.absent(),
+                Value<double> defaultTaxPercent = const Value.absent(),
               }) => CompaniesCompanion.insert(
                 id: id,
                 name: name,
@@ -3784,6 +4052,7 @@ class $$CompaniesTableTableManager
                 defaultCurrency: defaultCurrency,
                 invoicePrefix: invoicePrefix,
                 invoiceCounter: invoiceCounter,
+                defaultTaxPercent: defaultTaxPercent,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
@@ -4904,6 +5173,10 @@ typedef $$InvoicesTableCreateCompanionBuilder =
       required String currency,
       Value<double> fxRateToAccount,
       Value<int> totalMinor,
+      Value<int> discountMinor,
+      Value<double> discountPercent,
+      Value<int> taxMinor,
+      Value<double> taxPercent,
       Value<String?> notes,
       Value<int?> subscriptionId,
       Value<DateTime> createdAt,
@@ -4919,6 +5192,10 @@ typedef $$InvoicesTableUpdateCompanionBuilder =
       Value<String> currency,
       Value<double> fxRateToAccount,
       Value<int> totalMinor,
+      Value<int> discountMinor,
+      Value<double> discountPercent,
+      Value<int> taxMinor,
+      Value<double> taxPercent,
       Value<String?> notes,
       Value<int?> subscriptionId,
       Value<DateTime> createdAt,
@@ -5049,6 +5326,26 @@ class $$InvoicesTableFilterComposer
 
   ColumnFilters<int> get totalMinor => $composableBuilder(
     column: $table.totalMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get discountMinor => $composableBuilder(
+    column: $table.discountMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get discountPercent => $composableBuilder(
+    column: $table.discountPercent,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get taxMinor => $composableBuilder(
+    column: $table.taxMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get taxPercent => $composableBuilder(
+    column: $table.taxPercent,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5208,6 +5505,26 @@ class $$InvoicesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get discountMinor => $composableBuilder(
+    column: $table.discountMinor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get discountPercent => $composableBuilder(
+    column: $table.discountPercent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get taxMinor => $composableBuilder(
+    column: $table.taxMinor,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get taxPercent => $composableBuilder(
+    column: $table.taxPercent,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get notes => $composableBuilder(
     column: $table.notes,
     builder: (column) => ColumnOrderings(column),
@@ -5299,6 +5616,24 @@ class $$InvoicesTableAnnotationComposer
 
   GeneratedColumn<int> get totalMinor => $composableBuilder(
     column: $table.totalMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get discountMinor => $composableBuilder(
+    column: $table.discountMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get discountPercent => $composableBuilder(
+    column: $table.discountPercent,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get taxMinor =>
+      $composableBuilder(column: $table.taxMinor, builder: (column) => column);
+
+  GeneratedColumn<double> get taxPercent => $composableBuilder(
+    column: $table.taxPercent,
     builder: (column) => column,
   );
 
@@ -5447,6 +5782,10 @@ class $$InvoicesTableTableManager
                 Value<String> currency = const Value.absent(),
                 Value<double> fxRateToAccount = const Value.absent(),
                 Value<int> totalMinor = const Value.absent(),
+                Value<int> discountMinor = const Value.absent(),
+                Value<double> discountPercent = const Value.absent(),
+                Value<int> taxMinor = const Value.absent(),
+                Value<double> taxPercent = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<int?> subscriptionId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -5460,6 +5799,10 @@ class $$InvoicesTableTableManager
                 currency: currency,
                 fxRateToAccount: fxRateToAccount,
                 totalMinor: totalMinor,
+                discountMinor: discountMinor,
+                discountPercent: discountPercent,
+                taxMinor: taxMinor,
+                taxPercent: taxPercent,
                 notes: notes,
                 subscriptionId: subscriptionId,
                 createdAt: createdAt,
@@ -5475,6 +5818,10 @@ class $$InvoicesTableTableManager
                 required String currency,
                 Value<double> fxRateToAccount = const Value.absent(),
                 Value<int> totalMinor = const Value.absent(),
+                Value<int> discountMinor = const Value.absent(),
+                Value<double> discountPercent = const Value.absent(),
+                Value<int> taxMinor = const Value.absent(),
+                Value<double> taxPercent = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<int?> subscriptionId = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -5488,6 +5835,10 @@ class $$InvoicesTableTableManager
                 currency: currency,
                 fxRateToAccount: fxRateToAccount,
                 totalMinor: totalMinor,
+                discountMinor: discountMinor,
+                discountPercent: discountPercent,
+                taxMinor: taxMinor,
+                taxPercent: taxPercent,
                 notes: notes,
                 subscriptionId: subscriptionId,
                 createdAt: createdAt,

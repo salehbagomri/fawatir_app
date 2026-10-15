@@ -63,6 +63,13 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen> {
                 title: Text(client.name),
                 actions: [
                   IconButton(
+                    icon: const Icon(Icons.post_add_rounded),
+                    tooltip: 'إنشاء فاتورة جديدة',
+                    onPressed: () {
+                      context.push('/invoices/new?clientId=${client.id}');
+                    },
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.autorenew),
                     tooltip: 'إدارة الاشتراكات',
                     onPressed: () {
@@ -80,7 +87,9 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen> {
                     icon: const Icon(Icons.more_vert),
                     tooltip: 'خيارات إضافية',
                     onSelected: (val) async {
-                      if (val == 'direct_pay') {
+                      if (val == 'new_invoice') {
+                        context.push('/invoices/new?clientId=${client.id}');
+                      } else if (val == 'direct_pay') {
                         context.push('/clients/${client.id}/pay');
                       } else if (val == 'preview_statement') {
                         final nav = Navigator.of(context, rootNavigator: true);
@@ -177,6 +186,16 @@ class _ClientDetailScreenState extends ConsumerState<ClientDetailScreen> {
                       }
                     },
                     itemBuilder: (ctx) => [
+                      const PopupMenuItem(
+                        value: 'new_invoice',
+                        child: Row(
+                          children: [
+                            Icon(Icons.post_add_rounded, color: AppColors.accent, size: 18),
+                            SizedBox(width: 8),
+                            Text('إنشاء فاتورة جديدة'),
+                          ],
+                        ),
+                      ),
                       const PopupMenuItem(
                         value: 'direct_pay',
                         child: Row(
@@ -482,16 +501,42 @@ class ClientInvoicesTab extends ConsumerWidget {
             actionLabel: 'إنشاء فاتورة جديدة',
             actionIcon: Icons.add,
             onAction: () {
-              context.go('/invoices/new');
+              context.push('/invoices/new?clientId=$clientId');
             },
           );
         }
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: invoices.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'الفواتير (${invoices.length})',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      context.push('/invoices/new?clientId=$clientId');
+                    },
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('فاتورة جديدة'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.accent,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                itemCount: invoices.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
             final invoice = invoices[index];
             final effectiveStatus = getEffectiveInvoiceStatus(invoice);
             final statusColor = _getStatusColor(effectiveStatus);
@@ -567,7 +612,10 @@ class ClientInvoicesTab extends ConsumerWidget {
               ),
             );
           },
-        );
+        ),
+      ),
+    ],
+  );
       },
     );
   }

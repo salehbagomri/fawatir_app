@@ -17,6 +17,7 @@ class Companies extends Table {
   TextColumn get defaultCurrency => text().withDefault(const Constant('USD'))();
   TextColumn get invoicePrefix => text().withDefault(const Constant('INV-'))();
   IntColumn get invoiceCounter => integer().withDefault(const Constant(0))();
+  RealColumn get defaultTaxPercent => real().withDefault(const Constant(0.0))();
 }
 
 class Clients extends Table {
@@ -42,6 +43,10 @@ class Invoices extends Table {
   TextColumn get currency => text()();
   RealColumn get fxRateToAccount => real().withDefault(const Constant(1.0))();
   IntColumn get totalMinor => integer().withDefault(const Constant(0))();
+  IntColumn get discountMinor => integer().withDefault(const Constant(0))();
+  RealColumn get discountPercent => real().withDefault(const Constant(0.0))();
+  IntColumn get taxMinor => integer().withDefault(const Constant(0))();
+  RealColumn get taxPercent => real().withDefault(const Constant(0.0))();
   TextColumn get notes => text().nullable()();
   IntColumn get subscriptionId =>
       integer().nullable().references(Subscriptions, #id)();

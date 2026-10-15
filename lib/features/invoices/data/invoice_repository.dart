@@ -8,19 +8,47 @@ class InvoiceRepository {
 
   InvoiceRepository(this._db);
 
+  static ({int subtotal, int discount, int tax, int total}) calculateTotals({
+    required int subtotalMinor,
+    double discountPercent = 0.0,
+    int discountMinor = 0,
+    double taxPercent = 0.0,
+    int taxMinor = 0,
+  }) {
+    int finalDiscount = discountMinor;
+    if (discountPercent > 0) {
+      finalDiscount = (subtotalMinor * discountPercent / 100).round();
+    }
+    if (finalDiscount > subtotalMinor) {
+      finalDiscount = subtotalMinor;
+    }
+    final netAfterDiscount = subtotalMinor - finalDiscount;
+    int finalTax = taxMinor;
+    if (taxPercent > 0) {
+      finalTax = (netAfterDiscount * taxPercent / 100).round();
+    }
+    final total = netAfterDiscount + finalTax;
+    return (
+      subtotal: subtotalMinor,
+      discount: finalDiscount,
+      tax: finalTax,
+      total: total,
+    );
+  }
+
   Future<int> createInvoiceWithItems(
       InvoicesCompanion invoice, List<InvoiceItemsCompanion> items) async {
     return _db.transaction(() async {
-      // 1. Insert the invoice with a temporary total of 0 (or whatever value is passed)
+      // 1. Insert the invoice
       final invoiceId = await _db.into(_db.invoices).insert(invoice);
 
       // 2. Insert items and calculate line totals
-      int calculatedTotalMinor = 0;
+      int subtotalMinor = 0;
       for (final item in items) {
         final double qty = item.quantity.value;
         final int price = item.unitPriceMinor.value;
         final int lineTotal = (qty * price).round();
-        calculatedTotalMinor += lineTotal;
+        subtotalMinor += lineTotal;
 
         final itemCompanion = item.copyWith(
           invoiceId: Value(invoiceId),
@@ -29,9 +57,27 @@ class InvoiceRepository {
         await _db.into(_db.invoiceItems).insert(itemCompanion);
       }
 
-      // 3. Update the invoice total
+      // 3. Compute discount, tax, and final total
+      final discPercent = invoice.discountPercent.present ? invoice.discountPercent.value : 0.0;
+      final discMinor = invoice.discountMinor.present ? invoice.discountMinor.value : 0;
+      final tPercent = invoice.taxPercent.present ? invoice.taxPercent.value : 0.0;
+      final tMinor = invoice.taxMinor.present ? invoice.taxMinor.value : 0;
+
+      final calc = calculateTotals(
+        subtotalMinor: subtotalMinor,
+        discountPercent: discPercent,
+        discountMinor: discMinor,
+        taxPercent: tPercent,
+        taxMinor: tMinor,
+      );
+
+      // 4. Update the invoice with computed totals
       await (_db.update(_db.invoices)..where((tbl) => tbl.id.equals(invoiceId))).write(
-        InvoicesCompanion(totalMinor: Value(calculatedTotalMinor)),
+        InvoicesCompanion(
+          discountMinor: Value(calc.discount),
+          taxMinor: Value(calc.tax),
+          totalMinor: Value(calc.total),
+        ),
       );
 
       return invoiceId;
@@ -77,13 +123,13 @@ class InvoiceRepository {
   Future<void> updateInvoiceWithItems(
       int invoiceId, InvoicesCompanion invoiceCompanion, List<InvoiceItemsCompanion> items) async {
     return _db.transaction(() async {
-      int calculatedTotalMinor = 0;
+      int subtotalMinor = 0;
       final processedItems = <InvoiceItemsCompanion>[];
       for (final item in items) {
         final double qty = item.quantity.value;
         final int price = item.unitPriceMinor.value;
         final int lineTotal = (qty * price).round();
-        calculatedTotalMinor += lineTotal;
+        subtotalMinor += lineTotal;
 
         processedItems.add(item.copyWith(
           invoiceId: Value(invoiceId),
@@ -91,8 +137,25 @@ class InvoiceRepository {
         ));
       }
 
+      final discPercent = invoiceCompanion.discountPercent.present ? invoiceCompanion.discountPercent.value : 0.0;
+      final discMinor = invoiceCompanion.discountMinor.present ? invoiceCompanion.discountMinor.value : 0;
+      final tPercent = invoiceCompanion.taxPercent.present ? invoiceCompanion.taxPercent.value : 0.0;
+      final tMinor = invoiceCompanion.taxMinor.present ? invoiceCompanion.taxMinor.value : 0;
+
+      final calc = calculateTotals(
+        subtotalMinor: subtotalMinor,
+        discountPercent: discPercent,
+        discountMinor: discMinor,
+        taxPercent: tPercent,
+        taxMinor: tMinor,
+      );
+
       await (_db.update(_db.invoices)..where((tbl) => tbl.id.equals(invoiceId))).write(
-        invoiceCompanion.copyWith(totalMinor: Value(calculatedTotalMinor)),
+        invoiceCompanion.copyWith(
+          discountMinor: Value(calc.discount),
+          taxMinor: Value(calc.tax),
+          totalMinor: Value(calc.total),
+        ),
       );
 
       await (_db.delete(_db.invoiceItems)..where((tbl) => tbl.invoiceId.equals(invoiceId))).go();

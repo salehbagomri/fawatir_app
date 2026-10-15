@@ -118,8 +118,12 @@ GoRouter createRouter({String initialLocation = '/splash'}) => GoRouter(
                 GoRoute(
                   path: 'new',
                   builder: (context, state) {
-                    final duplicateFrom = state.extra as int?;
-                    return InvoiceFormScreen(duplicateFromInvoiceId: duplicateFrom);
+                    final duplicateFrom = state.extra is int ? state.extra as int : null;
+                    final clientId = int.tryParse(state.uri.queryParameters['clientId'] ?? '');
+                    return InvoiceFormScreen(
+                      duplicateFromInvoiceId: duplicateFrom,
+                      initialClientId: clientId,
+                    );
                   },
                 ),
                 GoRoute(

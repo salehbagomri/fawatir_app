@@ -50,6 +50,11 @@ class InvoicePdfData {
   final String currency;
   final List<InvoiceLine> items;
   final String? notes;
+  final int discountMinor;
+  final int taxMinor;
+  final double discountPercent;
+  final double taxPercent;
+
   const InvoicePdfData({
     required this.company,
     required this.client,
@@ -59,8 +64,16 @@ class InvoicePdfData {
     required this.currency,
     required this.items,
     this.notes,
+    this.discountMinor = 0,
+    this.taxMinor = 0,
+    this.discountPercent = 0.0,
+    this.taxPercent = 0.0,
   });
-  int get totalMinor => items.fold(0, (s, e) => s + e.lineTotalMinor);
+
+  int get subtotalMinor => items.fold(0, (s, e) => s + e.lineTotalMinor);
+  int get totalMinor =>
+      (subtotalMinor - discountMinor).clamp(0, double.infinity).toInt() +
+      taxMinor;
 }
 
 final _accent = PdfColor.fromHex('#1F3A5F');
@@ -120,7 +133,7 @@ Future<Uint8List> buildInvoicePdf(InvoicePdfData data) async {
       pw.SizedBox(height: 24),
       _itemsTable(data, bold, medium),
       pw.SizedBox(height: 18),
-      _totals(data, bold),
+      _totals(data, bold, medium),
       if (data.notes != null && data.notes!.trim().isNotEmpty) ...[
         pw.SizedBox(height: 24),
         _notes(data.notes!, medium),
@@ -246,7 +259,12 @@ pw.Widget _bodyCell(String t, pw.TextAlign a, {pw.Font? bold}) => pw.Padding(
           textAlign: a, style: pw.TextStyle(font: bold, fontSize: 9.5, color: _dark)),
     );
 
-pw.Widget _totals(InvoicePdfData d, pw.Font bold) => pw.Row(
+pw.Widget _totals(InvoicePdfData d, pw.Font bold, pw.Font medium) {
+  final hasDiscount = d.discountMinor > 0;
+  final hasTax = d.taxMinor > 0;
+
+  if (!hasDiscount && !hasTax) {
+    return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.end,
       children: [
         pw.Container(
@@ -268,6 +286,83 @@ pw.Widget _totals(InvoicePdfData d, pw.Font bold) => pw.Row(
         ),
       ],
     );
+  }
+
+  return pw.Row(
+    mainAxisAlignment: pw.MainAxisAlignment.end,
+    children: [
+      pw.Container(
+        width: 240,
+        padding: const pw.EdgeInsets.all(10),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: _line, width: 0.8),
+          borderRadius: pw.BorderRadius.circular(6),
+        ),
+        child: pw.Column(
+          children: [
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('المجموع الفرعي',
+                    style: pw.TextStyle(font: medium, fontSize: 10, color: _muted)),
+                pw.Text(_money(d.subtotalMinor, d.currency),
+                    style: pw.TextStyle(font: medium, fontSize: 10, color: _dark)),
+              ],
+            ),
+            if (hasDiscount) ...[
+              pw.SizedBox(height: 4),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    d.discountPercent > 0
+                        ? 'الخصم (${d.discountPercent.toStringAsFixed(d.discountPercent.truncateToDouble() == d.discountPercent ? 0 : 1)}%)'
+                        : 'الخصم',
+                    style: pw.TextStyle(font: medium, fontSize: 10, color: PdfColors.red800),
+                  ),
+                  pw.Text('- ${_money(d.discountMinor, d.currency)}',
+                      style: pw.TextStyle(font: medium, fontSize: 10, color: PdfColors.red800)),
+                ],
+              ),
+            ],
+            if (hasTax) ...[
+              pw.SizedBox(height: 4),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    d.taxPercent > 0
+                        ? 'الضريبة (${d.taxPercent.toStringAsFixed(d.taxPercent.truncateToDouble() == d.taxPercent ? 0 : 1)}%)'
+                        : 'الضريبة',
+                    style: pw.TextStyle(font: medium, fontSize: 10, color: _muted)),
+                  pw.Text('+ ${_money(d.taxMinor, d.currency)}',
+                      style: pw.TextStyle(font: medium, fontSize: 10, color: _dark)),
+                ],
+              ),
+            ],
+            pw.SizedBox(height: 8),
+            pw.Container(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: pw.BoxDecoration(
+                color: _accent,
+                borderRadius: pw.BorderRadius.circular(4),
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text('الإجمالي النهائي',
+                      style: pw.TextStyle(font: bold, fontSize: 11, color: PdfColors.white)),
+                  pw.Text(_money(d.totalMinor, d.currency),
+                      style: pw.TextStyle(font: bold, fontSize: 12, color: PdfColors.white)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
 
 pw.Widget _notes(String notes, pw.Font medium) => pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,

@@ -20,7 +20,21 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) => m.createAll(),
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.addColumn(companies, companies.defaultTaxPercent);
+            await m.addColumn(invoices, invoices.discountMinor);
+            await m.addColumn(invoices, invoices.discountPercent);
+            await m.addColumn(invoices, invoices.taxMinor);
+            await m.addColumn(invoices, invoices.taxPercent);
+          }
+        },
+      );
 
   Future<File> databaseFile() async {
     final dbFolder = await getApplicationDocumentsDirectory();
