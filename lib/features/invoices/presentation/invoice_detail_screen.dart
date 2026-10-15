@@ -687,23 +687,28 @@ class InvoiceDetailScreen extends ConsumerWidget {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.query_stats_rounded,
-                                            size: 20,
-                                            color: isProfitable ? Colors.green.shade800 : Colors.red.shade800,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          const Text(
-                                            'تحليل الأرباح والتكاليف',
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.dark,
+                                      Expanded(
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.query_stats_rounded,
+                                              size: 20,
+                                              color: isProfitable ? Colors.green.shade800 : Colors.red.shade800,
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 8),
+                                            const Flexible(
+                                              child: Text(
+                                                'تحليل الأرباح والتكاليف',
+                                                style: TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.dark,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

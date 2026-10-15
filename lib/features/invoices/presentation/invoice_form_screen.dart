@@ -1281,50 +1281,98 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                       Row(
                         children: [
                           Icon(
-                            _estimatedProfitMinor >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                            _estimatedProfitMinor >= 0 ? Icons.query_stats_rounded : Icons.trending_down_rounded,
                             color: _estimatedProfitMinor >= 0 ? Colors.green.shade800 : Colors.red.shade800,
-                            size: 20,
+                            size: 18,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            'تحليل الأرباح التقديرية (سري خاص بك):',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: _estimatedProfitMinor >= 0 ? Colors.green.shade900 : Colors.red.shade900,
+                          Expanded(
+                            child: Text(
+                              'تحليل الأرباح التقديرية:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: _estimatedProfitMinor >= 0 ? Colors.green.shade900 : Colors.red.shade900,
+                              ),
                             ),
                           ),
-                          const Spacer(),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.green.shade100,
+                              color: Colors.amber.shade100,
                               borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: Colors.amber.shade300),
                             ),
-                            child: Text(
-                              'سري • لن يظهر بالـ PDF',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade900),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.lock_outline, size: 10, color: Colors.amber.shade900),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'سري • لا يظهر بالـ PDF',
+                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            _transactionFeesMinor > 0
-                                ? 'التكلفة: ${formatMoney(_totalCostMinor, _invoiceCurrency)} + رسوم: ${formatMoney(_transactionFeesMinor, _invoiceCurrency)}'
-                                : 'التكلفة: ${formatMoney(_totalCostMinor, _invoiceCurrency)}',
-                            style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                          const Text(
+                            'إجمالي التكلفة والرسوم:',
+                            style: TextStyle(fontSize: 12, color: AppColors.muted),
                           ),
                           Text(
-                            _totalMinor > 0
-                                ? 'صافي الربح: ${formatMoney(_estimatedProfitMinor, _invoiceCurrency)} (${((_estimatedProfitMinor / _totalMinor) * 100).toStringAsFixed(1)}%)'
-                                : 'صافي الربح: ${formatMoney(_estimatedProfitMinor, _invoiceCurrency)}',
+                            _transactionFeesMinor > 0
+                                ? '${formatMoney(_totalCostMinor, _invoiceCurrency)} + ${formatMoney(_transactionFeesMinor, _invoiceCurrency)} (رسوم)'
+                                : formatMoney(_totalCostMinor, _invoiceCurrency),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                'صافي الربح التقديري:',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: AppColors.dark,
+                                ),
+                              ),
+                              if (_totalMinor > 0) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: _estimatedProfitMinor >= 0 ? Colors.green.shade100 : Colors.red.shade100,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '${((_estimatedProfitMinor / _totalMinor) * 100).toStringAsFixed(1)}%',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: _estimatedProfitMinor >= 0 ? Colors.green.shade900 : Colors.red.shade900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          Text(
+                            '${_estimatedProfitMinor >= 0 ? '+' : ''}${formatMoney(_estimatedProfitMinor, _invoiceCurrency)}',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 14,
+                              fontSize: 15,
                               color: _estimatedProfitMinor >= 0 ? Colors.green.shade800 : Colors.red.shade800,
                             ),
                           ),

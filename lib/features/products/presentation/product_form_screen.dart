@@ -192,32 +192,36 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                       Row(
                         children: [
                           Expanded(
+                            flex: 3,
                             child: TextFormField(
                               controller: _codeController,
                               decoration: const InputDecoration(
-                                labelText: 'كود / رمز الصنف (اختياري)',
+                                labelText: 'كود / رمز الصنف',
                                 hintText: 'مثال: NET-50',
-                                prefixIcon: Icon(Icons.qr_code),
+                                prefixIcon: Icon(Icons.qr_code, size: 20),
                                 border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           Expanded(
+                            flex: 2,
                             child: DropdownButtonFormField<String>(
                               initialValue: _currency,
+                              isExpanded: true,
                               decoration: const InputDecoration(
                                 labelText: 'العملة',
-                                prefixIcon: Icon(Icons.attach_money),
                                 border: OutlineInputBorder(),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                               ),
                               items: const [
-                                DropdownMenuItem(value: 'USD', child: Text('دولار (USD)')),
-                                DropdownMenuItem(value: 'SAR', child: Text('ريال سعودي (SAR)')),
-                                DropdownMenuItem(value: 'YER', child: Text('ريال يمني (YER)')),
-                                DropdownMenuItem(value: 'AED', child: Text('درهم إماراتي (AED)')),
-                                DropdownMenuItem(value: 'EGP', child: Text('جنيه مصري (EGP)')),
-                                DropdownMenuItem(value: 'EUR', child: Text('يورو (EUR)')),
+                                DropdownMenuItem(value: 'USD', child: Text(r'USD ($)')),
+                                DropdownMenuItem(value: 'SAR', child: Text('SAR (ر.س)')),
+                                DropdownMenuItem(value: 'YER', child: Text('YER (ر.ي)')),
+                                DropdownMenuItem(value: 'AED', child: Text('AED (د.إ)')),
+                                DropdownMenuItem(value: 'EGP', child: Text('EGP (ج.م)')),
+                                DropdownMenuItem(value: 'EUR', child: Text('EUR (€)')),
                               ],
                               onChanged: (val) {
                                 if (val != null) setState(() => _currency = val);
@@ -244,11 +248,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
-                          const Icon(Icons.monetization_on_outlined, color: AppColors.accent, size: 20),
-                          const SizedBox(width: 8),
-                          const Text(
+                          Icon(Icons.monetization_on_outlined, color: AppColors.accent, size: 20),
+                          SizedBox(width: 8),
+                          Text(
                             'التسعير وحساب الأرباح',
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.accent),
                           ),
@@ -262,11 +266,12 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                               controller: _priceController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               decoration: InputDecoration(
-                                labelText: 'سعر البيع للعميل *',
+                                labelText: 'سعر البيع *',
                                 hintText: '65.00',
                                 suffixText: _currency,
-                                prefixIcon: const Icon(Icons.sell_outlined),
+                                prefixIcon: const Icon(Icons.sell_outlined, size: 20),
                                 border: const OutlineInputBorder(),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
@@ -280,17 +285,18 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                               },
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: TextFormField(
                               controller: _costController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               decoration: InputDecoration(
-                                labelText: 'سعر التكلفة عليك',
+                                labelText: 'سعر التكلفة',
                                 hintText: '55.00',
                                 suffixText: _currency,
-                                prefixIcon: const Icon(Icons.account_balance_wallet_outlined),
+                                prefixIcon: const Icon(Icons.account_balance_wallet_outlined, size: 20),
                                 border: const OutlineInputBorder(),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                               ),
                               validator: (value) {
                                 if (value != null && value.trim().isNotEmpty) {
@@ -391,23 +397,29 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 20.0),
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: _isSaving
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Icon(Icons.check_circle_outline),
+                    label: Text(
+                      isEditing ? 'حفظ التعديلات' : 'إضافة الصنف للدليل',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: _isSaving ? null : _save,
+                  ),
                 ),
-                icon: _isSaving
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.check_circle_outline),
-                label: Text(
-                  isEditing ? 'حفظ التعديلات' : 'إضافة الصنف للدليل',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                onPressed: _isSaving ? null : _save,
               ),
             ],
           ),
