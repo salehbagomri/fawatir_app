@@ -131,6 +131,8 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
     final currentFilter = ref.read(invoiceDateFilterProvider);
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -138,62 +140,79 @@ class _InvoicesScreenState extends ConsumerState<InvoicesScreen> {
         textDirection: TextDirection.rtl,
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.calendar_month_rounded, color: AppColors.accent, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'تصفية الفواتير حسب الفترة',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            padding: const EdgeInsets.fromLTRB(0, 12, 0, 8),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 38,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                    ],
+                    ),
                   ),
-                ),
-                const Divider(),
-                ...InvoiceDateFilterOption.values.map((opt) {
-                  final isSelected = currentFilter.option == opt;
-                  return ListTile(
-                    leading: Icon(
-                      isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
-                      color: isSelected ? AppColors.accent : Colors.grey,
+                  const SizedBox(height: 12),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.calendar_month_rounded, color: AppColors.accent, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'تصفية الفواتير حسب الفترة',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                      ],
                     ),
-                    title: Text(
-                      opt.label,
-                      style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? AppColors.accent : null,
+                  ),
+                  const Divider(),
+                  ...InvoiceDateFilterOption.values.map((opt) {
+                    final isSelected = currentFilter.option == opt;
+                    return ListTile(
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+                      leading: Icon(
+                        isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                        color: isSelected ? AppColors.accent : Colors.grey,
                       ),
-                    ),
-                    onTap: () async {
-                      Navigator.of(ctx).pop();
-                      if (opt == InvoiceDateFilterOption.custom) {
-                        final picked = await showDateRangePicker(
-                          context: context,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2035),
-                          initialDateRange: currentFilter.customRange ??
-                              DateTimeRange(
-                                start: DateTime.now().subtract(const Duration(days: 30)),
-                                end: DateTime.now(),
-                              ),
-                        );
-                        if (picked != null) {
-                          ref.read(invoiceDateFilterProvider.notifier).setFilter(opt, picked);
+                      title: Text(
+                        opt.label,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? AppColors.accent : null,
+                        ),
+                      ),
+                      onTap: () async {
+                        Navigator.of(ctx).pop();
+                        if (opt == InvoiceDateFilterOption.custom) {
+                          final picked = await showDateRangePicker(
+                            context: context,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2035),
+                            initialDateRange: currentFilter.customRange ??
+                                DateTimeRange(
+                                  start: DateTime.now().subtract(const Duration(days: 30)),
+                                  end: DateTime.now(),
+                                ),
+                          );
+                          if (picked != null) {
+                            ref.read(invoiceDateFilterProvider.notifier).setFilter(opt, picked);
+                          }
+                        } else {
+                          ref.read(invoiceDateFilterProvider.notifier).setFilter(opt);
                         }
-                      } else {
-                        ref.read(invoiceDateFilterProvider.notifier).setFilter(opt);
-                      }
-                    },
-                  );
-                }),
-              ],
+                      },
+                    );
+                  }),
+                ],
+              ),
             ),
           ),
         ),

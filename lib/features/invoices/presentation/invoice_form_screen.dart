@@ -910,15 +910,53 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'بنود الفاتورة',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Row(
+                    children: [
+                      const Text(
+                        'بنود الفاتورة',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${_itemRows.length}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.accent, fontSize: 12),
+                        ),
+                      ),
+                    ],
                   ),
-                  TextButton.icon(
-                    onPressed: _addItemRow,
-                    icon: const Icon(Icons.add),
-                    label: const Text('إضافة بند'),
-                    style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          final newRow = InvoiceItemRow();
+                          setState(() {
+                            _itemRows.add(newRow);
+                          });
+                          _pickProductForItem(newRow);
+                        },
+                        icon: const Icon(Icons.playlist_add_rounded, size: 18),
+                        label: const Text('من الدليل'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.accent,
+                          side: const BorderSide(color: AppColors.accent),
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        onPressed: _addItemRow,
+                        icon: const Icon(Icons.add),
+                        label: const Text('إضافة بند'),
+                        style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1070,7 +1108,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                                   controller: row.costController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   decoration: InputDecoration(
-                                    labelText: 'سعر التكلفة للوحدة (خاص بالأرباح - اختياري)',
+                                    labelText: 'سعر التكلفة للوحدة (اختياري)',
                                     hintText: '0.00',
                                     helperText: 'سري لحساب أرباحك، لا يظهر للعميل في الفاتورة والـ PDF',
                                     helperStyle: TextStyle(fontSize: 10, color: Colors.blueGrey.shade700),
@@ -1110,52 +1148,87 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      // Discount row
-                      Row(
+
+                      // Discount Section
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            flex: 3,
-                            child: TextFormField(
-                              controller: _discountController,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                              decoration: InputDecoration(
-                                labelText: _isDiscountPercent ? 'نسبة الخصم (%)' : 'مبلغ الخصم ($_invoiceCurrency)',
-                                border: const OutlineInputBorder(),
-                                prefixIcon: const Icon(Icons.discount_outlined),
-                                hintText: _isDiscountPercent ? 'مثال: 10' : 'مثال: 50.00',
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'الخصم (اختياري):',
+                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.dark),
                               ),
-                            ),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.line),
+                                ),
+                                padding: const EdgeInsets.all(2),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(6),
+                                      onTap: () => setState(() => _isDiscountPercent = false),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: !_isDiscountPercent ? AppColors.accent : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'مبلغ ($_invoiceCurrency)',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: !_isDiscountPercent ? Colors.white : AppColors.muted,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    InkWell(
+                                      borderRadius: BorderRadius.circular(6),
+                                      onTap: () => setState(() => _isDiscountPercent = true),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: _isDiscountPercent ? AppColors.accent : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          'نسبة (%)',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: _isDiscountPercent ? Colors.white : AppColors.muted,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: SegmentedButton<bool>(
-                              segments: const [
-                                ButtonSegment<bool>(
-                                  value: false,
-                                  label: Text('مبلغ'),
-                                ),
-                                ButtonSegment<bool>(
-                                  value: true,
-                                  label: Text('%'),
-                                ),
-                              ],
-                              selected: {_isDiscountPercent},
-                              onSelectionChanged: (val) {
-                                setState(() {
-                                  _isDiscountPercent = val.first;
-                                });
-                              },
-                              style: const ButtonStyle(
-                                visualDensity: VisualDensity.compact,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
+                          const SizedBox(height: 10),
+                          TextFormField(
+                            controller: _discountController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: _isDiscountPercent ? 'نسبة الخصم (%)' : 'مبلغ الخصم ($_invoiceCurrency)',
+                              hintText: _isDiscountPercent ? 'مثال: 10' : 'مثال: 50.00',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.discount_outlined),
+                              suffixText: _isDiscountPercent ? '%' : _invoiceCurrency,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 16),
+
                       // Tax row
                       TextFormField(
                         controller: _taxPercentController,
@@ -1164,7 +1237,8 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                           labelText: 'نسبة ضريبة القيمة المضافة (%)',
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.receipt_long_outlined),
-                          hintText: 'مثال: 15 (0 تعني بدون ضريبة)',
+                          suffixText: '%',
+                          hintText: '0 تعني بدون ضريبة (مثال: 15)',
                         ),
                       ),
                       const Divider(height: 24),
@@ -1172,9 +1246,10 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                         controller: _feesController,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         decoration: InputDecoration(
-                          labelText: 'رسوم/عمولة العملية عليك (البنك أو التحويل)',
-                          hintText: 'مثال: 1.50',
-                          helperText: 'تُخصم من صافي أرباحك الشخصية ولا تُضاف على الفاتورة',
+                          labelText: 'رسوم العملية أو التحويل (البنك)',
+                          hintText: '0.00',
+                          helperText: 'سري: تُخصم من أرباحك الشخصية ولا تظهر للعميل على الفاتورة',
+                          helperStyle: TextStyle(fontSize: 11, color: Colors.blueGrey.shade700),
                           prefixIcon: const Icon(Icons.credit_card_outlined),
                           suffixText: _invoiceCurrency,
                           border: const OutlineInputBorder(),
