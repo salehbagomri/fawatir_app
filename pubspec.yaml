@@ -74,6 +74,8 @@ flutter:
 
   assets:
     - assets/icons/logo.png
+    - assets/icons/logo-tran.png
+    - assets/icons/logo-bg-white.png
     - assets/fonts/IBMPlexSansArabic-Regular.ttf
     - assets/fonts/IBMPlexSansArabic-Medium.ttf
     - assets/fonts/IBMPlexSansArabic-Bold.ttf

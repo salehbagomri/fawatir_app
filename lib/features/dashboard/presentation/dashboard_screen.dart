@@ -148,12 +148,24 @@ class _DashboardBody extends ConsumerWidget {
           flexibleSpace: FlexibleSpaceBar(
             titlePadding: const EdgeInsetsDirectional.only(
                 start: 20, bottom: 16),
-            title: const Text(
-              'لوحة المعلومات',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/icons/logo-tran.png',
+                  width: 24,
+                  height: 24,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'لوحة المعلومات',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+              ],
             ),
             background: Container(
               decoration: const BoxDecoration(
@@ -169,6 +181,20 @@ class _DashboardBody extends ConsumerWidget {
               ),
               child: Stack(
                 children: [
+                  // الشعار كعلامة مائية خفيفة وفخمة
+                  Positioned(
+                    top: 10,
+                    left: 15,
+                    child: Opacity(
+                      opacity: 0.12,
+                      child: Image.asset(
+                        'assets/icons/logo-tran.png',
+                        width: 95,
+                        height: 95,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
                   // دوائر تزيينية شفافة
                   Positioned(
                     top: -30,
