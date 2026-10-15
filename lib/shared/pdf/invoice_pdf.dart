@@ -83,14 +83,22 @@ String _date(DateTime d) =>
     '${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
 
 Future<(pw.Font, pw.Font, pw.Font)> _loadFonts() async {
-  final regData = await rootBundle.load('assets/fonts/IBMPlexSansArabic-Regular.ttf');
-  final medData = await rootBundle.load('assets/fonts/IBMPlexSansArabic-Medium.ttf');
-  final boldData = await rootBundle.load('assets/fonts/IBMPlexSansArabic-Bold.ttf');
-  return (
-    pw.Font.ttf(regData),
-    pw.Font.ttf(medData),
-    pw.Font.ttf(boldData),
-  );
+  try {
+    final regData = await rootBundle.load('assets/fonts/IBMPlexSansArabic-Regular.ttf');
+    final medData = await rootBundle.load('assets/fonts/IBMPlexSansArabic-Medium.ttf');
+    final boldData = await rootBundle.load('assets/fonts/IBMPlexSansArabic-Bold.ttf');
+    return (
+      pw.Font.ttf(regData),
+      pw.Font.ttf(medData),
+      pw.Font.ttf(boldData),
+    );
+  } catch (_) {
+    return (
+      await PdfGoogleFonts.iBMPlexSansArabicRegular(),
+      await PdfGoogleFonts.iBMPlexSansArabicMedium(),
+      await PdfGoogleFonts.iBMPlexSansArabicBold(),
+    );
+  }
 }
 
 Future<Uint8List> buildInvoicePdf(InvoicePdfData data) async {

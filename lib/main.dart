@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fawatir/app/theme.dart';
 import 'package:fawatir/app/router.dart';
+import 'package:go_router/go_router.dart';
 
 void main() {
   // التقاط الأخطاء غير المتوقعة في العرض ومنع ظهور الشاشة الحمراء
@@ -70,7 +71,8 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final GoRouter? router;
+  const MyApp({super.key, this.router});
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +87,7 @@ class MyApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      routerConfig: goRouter,
+      routerConfig: router ?? goRouter,
     );
   }
 }

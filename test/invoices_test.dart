@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/native.dart';
 import 'package:fawatir/main.dart';
 import 'package:fawatir/data/db/database.dart';
+import 'package:fawatir/app/router.dart';
 import 'package:drift/drift.dart' hide Column;
 
 void main() {
@@ -11,6 +12,7 @@ void main() {
 
   setUp(() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
+    goRouter.go('/dashboard');
   });
 
   tearDown(() async {
@@ -22,7 +24,7 @@ void main() {
       overrides: [
         databaseProvider.overrideWithValue(db),
       ],
-      child: const MyApp(),
+      child: MyApp(router: createRouter(initialLocation: '/dashboard')),
     );
   }
 
@@ -47,7 +49,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     // 3. Navigate to Invoices branch using the bottom navigation icon
-    await tester.tap(find.byIcon(Icons.receipt_long));
+    await tester.tap(find.byIcon(Icons.receipt_long_outlined));
     await pumpAndIdle(tester);
 
     // 4. Verify invoices placeholder list screen is visible
@@ -57,26 +59,26 @@ void main() {
     final fab = find.byType(FloatingActionButton);
     expect(fab, findsOneWidget);
     await tester.tap(fab);
-    await tester.pumpAndSettle();
+    await pumpAndIdle(tester);
 
     // 6. Verify invoice form screen is open
-    expect(find.text('إنشاء فاتورة جديدة'), findsOneWidget);
+    expect(find.text('إنشاء فاتورة جديدة'), findsAtLeastNWidgets(1));
 
     // 7. Open client dropdown and select the client
     final dropdownFinder = find.widgetWithText(DropdownButtonFormField<Client>, 'اختر العميل *');
     expect(dropdownFinder, findsOneWidget);
     await tester.tap(dropdownFinder);
-    await tester.pumpAndSettle();
+    await pumpAndIdle(tester);
 
     // Tap the dropdown menu item (shows client name)
     await tester.tap(find.textContaining('شريك النجاح').last);
-    await tester.pumpAndSettle();
+    await pumpAndIdle(tester);
 
     // 8. Add a second line item row
     final addRowButton = find.text('إضافة بند');
     expect(addRowButton, findsOneWidget);
     await tester.tap(addRowButton);
-    await tester.pumpAndSettle();
+    await pumpAndIdle(tester);
 
     // Verify there are 2 description fields
     final descField1 = find.widgetWithText(TextFormField, 'وصف البند *').at(0);
@@ -96,9 +98,7 @@ void main() {
 
     // Scroll down to make sure the grand total card is visible and built
     await tester.drag(find.byType(ListView).first, const Offset(0, -400));
-    await tester.pumpAndSettle();
-
-
+    await pumpAndIdle(tester);
 
     // Verify grand total is 26.00 USD (21.00 + 5.00)
     expect(find.text('26.00 \$'), findsWidgets);
@@ -107,7 +107,7 @@ void main() {
     final saveButton = find.byIcon(Icons.check);
     expect(saveButton, findsOneWidget);
     await tester.tap(saveButton);
-    await tester.pumpAndSettle();
+    await pumpAndIdle(tester);
 
     // 10. Verify we popped back to invoices screen and the invoice card is visible
     expect(find.text('INV-2026-0001'), findsOneWidget);

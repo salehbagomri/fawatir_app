@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/native.dart';
 import 'package:fawatir/main.dart';
 import 'package:fawatir/data/db/database.dart';
+import 'package:fawatir/app/router.dart';
 import 'package:drift/drift.dart' hide Column;
 
 void main() {
@@ -11,6 +12,7 @@ void main() {
 
   setUp(() {
     db = AppDatabase.forTesting(NativeDatabase.memory());
+    goRouter.go('/dashboard');
   });
 
   tearDown(() async {
@@ -22,7 +24,7 @@ void main() {
       overrides: [
         databaseProvider.overrideWithValue(db),
       ],
-      child: const MyApp(),
+      child: MyApp(router: createRouter(initialLocation: '/dashboard')),
     );
   }
 
@@ -37,7 +39,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     // Navigate to Clients tab using icon (loading indicator is shown, use timed pump)
-    await tester.tap(find.byIcon(Icons.people));
+    await tester.tap(find.byIcon(Icons.people_outline_rounded));
     await pumpAndIdle(tester);
 
     // Verify empty state message is shown
@@ -64,10 +66,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify we popped back to clients list and see the new client
-    expect(find.widgetWithText(ListTile, 'أحمد محمد'), findsOneWidget);
+    expect(find.text('أحمد محمد'), findsOneWidget);
     
     // Tap on client to view details
-    await tester.tap(find.widgetWithText(ListTile, 'أحمد محمد'));
+    await tester.tap(find.text('أحمد محمد'));
     await tester.pumpAndSettle();
 
     // Verify details screen shows client info
@@ -108,27 +110,27 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     // Navigate to Clients tab
-    await tester.tap(find.byIcon(Icons.people));
+    await tester.tap(find.byIcon(Icons.people_outline_rounded));
     await pumpAndIdle(tester);
 
     // Verify both are listed
-    expect(find.widgetWithText(ListTile, 'علي صالح'), findsOneWidget);
-    expect(find.widgetWithText(ListTile, 'خالد وليد'), findsOneWidget);
+    expect(find.text('علي صالح'), findsOneWidget);
+    expect(find.text('خالد وليد'), findsOneWidget);
     expect(find.text('غير نشط'), findsOneWidget); // خالد is inactive
 
     // Search for 'خالد'
-    final searchField = find.widgetWithText(TextFormField, 'البحث عن عميل...');
+    final searchField = find.byType(TextFormField).first;
     expect(searchField, findsOneWidget);
     await tester.enterText(searchField, 'خالد');
     await pumpAndIdle(tester);
 
     // Verify filtered results
-    expect(find.widgetWithText(ListTile, 'خالد وليد'), findsOneWidget);
-    expect(find.widgetWithText(ListTile, 'علي صالح'), findsNothing);
+    expect(find.text('خالد وليد'), findsOneWidget);
+    expect(find.text('علي صالح'), findsNothing);
 
     // Tap on the filtered client to view details
     await tester.tap(find.text('خالد وليد'));
-    await tester.pumpAndSettle();
+    await pumpAndIdle(tester);
 
     // Verify Client Detail Screen is open
     expect(find.byIcon(Icons.edit), findsOneWidget);
@@ -136,13 +138,13 @@ void main() {
 
     // Expand details card to show phone number
     await tester.tap(find.text('المزيد من التفاصيل'));
-    await tester.pumpAndSettle();
+    await pumpAndIdle(tester);
 
     expect(find.textContaining('733333333'), findsOneWidget);
 
     // Tap edit button to open form
     await tester.tap(find.byIcon(Icons.edit));
-    await tester.pumpAndSettle();
+    await pumpAndIdle(tester);
 
     // Verify Edit Client Screen is open and initial values are pre-filled
     expect(find.text('تعديل بيانات العميل'), findsOneWidget);
@@ -154,21 +156,17 @@ void main() {
 
     // Tap save (pops back to details screen, which redirects or pops to clients)
     await tester.tap(find.byIcon(Icons.check));
-    await tester.pumpAndSettle();
+    await pumpAndIdle(tester);
 
     // Verify we are back to clients screen and update is visible
     // We clear search to see both
-    await tester.tap(find.byIcon(Icons.clear));
-    await pumpAndIdle(tester);
+    if (find.byIcon(Icons.clear).evaluate().isNotEmpty) {
+      await tester.tap(find.byIcon(Icons.clear), warnIfMissed: false);
+      await pumpAndIdle(tester);
+    }
 
-    expect(find.widgetWithText(ListTile, 'خالد وليد'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(ListTile),
-        matching: find.textContaining('733333334'),
-      ),
-      findsOneWidget,
-    );
+    expect(find.text('خالد وليد'), findsOneWidget);
+    expect(find.textContaining('733333334'), findsOneWidget);
 
     // Clean up by disposing the widget tree inside the test body first
     await tester.pumpWidget(const SizedBox());

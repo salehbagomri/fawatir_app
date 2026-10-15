@@ -1,17 +1,146 @@
-# fawatir
+# فواتير | Fawatir App 📑💼
 
-A new Flutter project.
+نظام فوترة وإدارة حسابات العملاء والاشتراكات الشهرية المتكامل — مبني بإتقان واحترافية عالية باستخدام **Flutter** و **Drift (SQLite)** و **Riverpod**.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## 🌟 نظرة عامة (Overview)
 
-A few resources to get you started if this is your first Flutter project:
+تطبيق **فواتير** هو حل مكتبي ومحمول متكامل (Offline-First) موجّه للشركات، المكاتب المهنية، والمستقلين. يوفر دورة فوترة مالية متكاملة تبدأ من إصدار الفاتورة، تتبع الدفعات الجزئية والكاملة، توليد سندات القبض الآلية، استخراج كشوفات حساب تفصيلية، وإدارة الاشتراكات المتكررة، مع تصدير مستندات PDF احترافية تدعم اللغة العربية بنسبة 100% دون الحاجة إلى اتصال بالإنترنت.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## ✨ المميزات الرئيسية (Core Features)
+
+### 1. دورة الفوترة الذكية المتكاملة (Invoicing Engine)
+- **حالات الفاتورة المنضبطة**: مسودة (Draft) ➔ صادرة (Issued) ➔ مدفوعة جزئياً (Partially Paid) ➔ مدفوعة بالكامل (Paid) ➔ ملغاة (Cancelled).
+- **ترقيم تلقائي متسلسل**: ترقيم مهني لكل سنة مالية (مثل `INV-2026-0001`) لمنع التكرار أو الفجوات.
+- **حسابات نقدية دقيقة**: معالجة المبالغ الرياضية بالوحدات الصغرى (Minor Units / Cents) لتفادي أخطاء الفاصلة العائمة (Floating-point precision errors).
+- **تعديل حالة الفاتورة يدوياً**: مع شاشات تأكيد وحماية المحاسبة من التضارب.
+
+### 2. سندات القبض والدفعات (Receipts & Payments)
+- **تسجيل تحصيل فوري**: إمكانية تسجيل دفعة كاملة أو جزئية على الفاتورة مع تحديد وسيلة الدفع (نقداً، تحويل بنكي، شيك، بطاقة).
+- **إصدار سند قبض آلي (Receipt Voucher)**: بمجرد تأكيد التحصيل، يُولّد سند قبض رسمي برقم تسلسلي خاص (`REC-2026-0001`).
+- **تطبيق التفقيد باللغة العربية (Tafqeet)**: كتابة المبلغ بالحروف تلقائياً (مثال: "فقط ألف وخمسمائة ريال سعودي لا غير").
+
+### 3. كشوفات الحساب المحاسبية (Client Ledger & Statements)
+- **دفتر أستاذ تفصيلي للعميل**: تتبع جميع الحركات المدينة (الفواتير الصادرة) والدائنة (الدفعات وسندات القبض).
+- **كشف حساب مرن**: تحديد فترة زمنية مخصصة (من تاريخ - إلى تاريخ) مع حساب الرصيد الافتتاحي، إجمالي المدين والدائن، والرصيد الختامي.
+- **تصدير ومشاركة PDF**: طباعة ومشاركة كشف الحساب مباشرة بتصميم رسمي أنيق ومفصل.
+
+### 4. إدارة الاشتراكات الدورية (Recurring Subscriptions)
+- **توليد فواتير دورية آلية**: محرك اشتراكات ذكي يُنشئ فواتير شهرية/سنوية تلقائياً مع بداية كل دورة دون تكرار.
+- **إشعارات ومتابعة**: تنبيهات بالفواتير المستحقة ودورات التجديد لضمان عدم تأخر التحصيل.
+
+### 5. مستندات PDF احترافية تعمل دون إنترنت (Offline-First PDF)
+- **خطوط عربية مدمجة**: تحميل مباشر لخط `IBM Plex Sans Arabic` من الحزم المحلية للتطبيق (`assets/fonts/`)، مما يضمن عمل التصدير في وضع الطيران دون الحاجة لشبكة الإنترنت.
+- **دعم رموز الاستجابة السريعة (QR Code)**: متوافق مع متطلبات الفوترة الإلكترونية.
+- **تخطيط صفحات متعددة ذكي**: دعم ترقيم الصفحات، رؤوس وتذييلات رسمية، وبيانات المنشأة التجارية.
+
+### 6. الأمان والنسخ الاحتياطي (Backup & Security)
+- **نسخ احتياطي محلي وسحابي**: تصدير واستيراد قواعد البيانات مع تشفير وتحقق من سلامة الملفات عبر (SHA-256 Checksums).
+- **تكامل اختياري مع Google Drive**: حفظ النسخ السحابية بضغطة زر.
+- **قاعدة بيانات مشفرة ومؤمنة**: حفظ محلي عبر تقنية Drift SQLite عالية الأداء.
+
+---
+
+## 🎨 الهوية البصرية والتصميم (Design System)
+
+تم بناء واجهات التطبيق وفق أحدث معايير **Material 3** مع مراعاة كاملة لخصوصية اللغة العربية واتجاه العرض (RTL-First):
+- **اللون الأساسي (Primary)**: كحلي داكن راقٍ `#1F3A5F` يضفي طابعاً مالياً وقانونياً موثوقاً.
+- **لون التمييز (Accent)**: عنبري ذهبي `#D97706` للإجراءات المحورية وسندات القبض.
+- **الحالات (Semantics)**:
+  - 🟢 الأخضر الزمردي `#059669`: للمدفوع وموجب الرصيد.
+  - 🟠 البرتقالي الداكن `#EA580C`: للمستحق والمدفوع جزئياً.
+  - 🔴 الأحمر `#DC2626`: للملغى والمتأخر.
+- **تفاعلات دقيقة (Micro-interactions)**: استجابات لمسية ناعمة، بطاقات مظللة بعناية، وبطاقات ملخص إحصائية في أعلى كل قسم.
+
+---
+
+## 🏛️ البنية المعمارية (Architecture)
+
+يعتمد المشروع على معمارية الطبقات حسب الميزات (**Feature-First Layered Architecture**):
+
+```
+lib/
+├── app/                  # إعدادات التطبيق الرئيسية والمسارات (GoRouter) والثيم
+├── core/                 # الثوابت، أدوات الحسابات النقدية (Money)، وقاعدة البيانات (Drift)
+├── features/
+│   ├── clients/          # إدارة العملاء، الأرصدة، وسجل الاتصال
+│   ├── invoices/         # إنشاء وإدارة الفواتير، البنود، وحالات الفاتورة
+│   ├── payments/         # سندات القبض، تسجيل التحصيلات، وربطها بالفواتير
+│   ├── statements/       # كشوفات الحساب المحاسبية وحسابات الأستاذ
+│   ├── subscriptions/    # عقود واشتراكات العملاء ومولد الفواتير الآلي
+│   ├── settings/         # بيانات المؤسسة، العملة الافتراضية، والنسخ الاحتياطي
+│   └── dashboard/        # لوحة الإحصائيات العامة والمؤشرات البيانية
+└── shared/               # الأدوات المشتركة: محركات PDF، المكونات، وخطوط الطباعة
+```
+
+### حزمة التقنيات (Tech Stack):
+- **Framework**: [Flutter](https://flutter.dev) (v3.x / Dart 3.x)
+- **State Management**: [flutter_riverpod](https://riverpod.dev) (v2.6)
+- **Local Persistence & ORM**: [drift](https://drift.simonbinder.eu) (SQLite) + `sqlite3_flutter_libs`
+- **Routing**: [go_router](https://pub.dev/packages/go_router)
+- **PDF Generation & Printing**: [pdf](https://pub.dev/packages/pdf) & [printing](https://pub.dev/packages/printing)
+- **Cloud Integration**: [googleapis](https://pub.dev/packages/googleapis) (Google Drive API)
+
+---
+
+## 🚀 التثبيت والتشغيل (Getting Started)
+
+### المتطلبات الأساسية (Prerequisites):
+- تثبيت Flutter SDK (الإصدار 3.24 فما فوق).
+- بيئة تطوير (VS Code أو Android Studio).
+
+### خطوات الإعداد:
+
+1. **استنساخ المستودع (Clone repository)**:
+   ```bash
+   git clone https://github.com/salehbagomri/fawatir_app.git
+   cd fawatir_app
+   ```
+
+2. **تثبيت الحزم والاعتماديات (Install dependencies)**:
+   ```bash
+   flutter pub get
+   ```
+
+3. **توليد ملفات قاعدة البيانات والنماذج (Code Generation)**:
+   ```bash
+   dart run build_runner build --delete-conflicting-outputs
+   ```
+
+4. **تشغيل التطبيق (Run application)**:
+   ```bash
+   flutter run
+   ```
+
+---
+
+## 🧪 الاختبارات والجودة (Testing & Code Quality)
+
+يخضع المشروع لمنظومة اختبارات شاملة تغطي كافة العمليات المالية والحسابية والواجهات:
+
+- **فحص الكود البرمجي (Static Analysis)**:
+  ```bash
+  flutter analyze lib/
+  ```
+  *(النتيجة: 0 مشاكل برمجية أو تحذيرات — No issues found!)*
+
+- **تشغيل الاختبارات الآلية (Automated Tests)**:
+  ```bash
+  flutter test
+  ```
+  - `database_test.dart`: اختبارات قاعدة البيانات وقيود المعاملات وتحديث الحالات.
+  - `money_test.dart`: اختبارات التحويل الرياضي للوحدات وتنسيق العملات.
+  - `statement_test.dart`: تدقيق كشوف الحساب ومطابقة الرصيد الرياضي.
+  - `subscription_generation_test.dart`: اختبار محرك الاشتراكات الدورية ومنع التكرار.
+  - `clients_test.dart`: اختبار شاشات وتدفق إدارة العملاء والبحث والتعديل.
+  - `invoices_test.dart`: اختبار نموذج الفواتير وحساب المجاميع الآلية وحفظ البنود.
+  - `widget_test.dart`: اختبار بدء التطبيق العام.
+
+---
+
+## 📄 الترخيص (License)
+
+هذا المشروع مطوّر ومملوك من قبل فريق التطوير — جميع الحقوق محفوظة © 2026.

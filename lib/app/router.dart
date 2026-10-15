@@ -18,11 +18,9 @@ import 'package:fawatir/features/invoices/presentation/invoice_detail_screen.dar
 import 'package:fawatir/features/payments/presentation/payment_form_screen.dart';
 import 'package:fawatir/features/subscriptions/presentation/generated_drafts_screen.dart';
 
-final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
-
-final goRouter = GoRouter(
-  navigatorKey: _rootNavigatorKey,
-  initialLocation: '/splash',
+GoRouter createRouter({String initialLocation = '/splash'}) => GoRouter(
+  navigatorKey: GlobalKey<NavigatorState>(debugLabel: 'root'),
+  initialLocation: initialLocation,
   debugLogDiagnostics: true,
   routes: [
     GoRoute(
@@ -179,6 +177,8 @@ final goRouter = GoRouter(
     ),
   ],
 );
+
+final goRouter = createRouter();
 
 class AppShell extends ConsumerWidget {
   const AppShell({
