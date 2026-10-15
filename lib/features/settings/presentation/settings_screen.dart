@@ -357,6 +357,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     context.go('/settings/company-setup');
                   },
                 ),
+                ListTile(
+                  leading: const Icon(Icons.inventory_2_outlined, color: AppColors.accent),
+                  title: const Text('دليل الأصناف والخدمات'),
+                  subtitle: const Text('إدارة المنتجات، باقات الخدمات، أسعار البيع والتكلفة'),
+                  trailing: const Icon(Icons.chevron_left),
+                  onTap: () {
+                    context.push('/products');
+                  },
+                ),
                 const Divider(),
                 
                 // Backup Header

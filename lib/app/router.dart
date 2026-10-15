@@ -17,6 +17,8 @@ import 'package:fawatir/features/invoices/presentation/invoice_form_screen.dart'
 import 'package:fawatir/features/invoices/presentation/invoice_detail_screen.dart';
 import 'package:fawatir/features/payments/presentation/payment_form_screen.dart';
 import 'package:fawatir/features/subscriptions/presentation/generated_drafts_screen.dart';
+import 'package:fawatir/features/products/presentation/products_screen.dart';
+import 'package:fawatir/features/products/presentation/product_form_screen.dart';
 
 GoRouter createRouter({String initialLocation = '/splash'}) => GoRouter(
   navigatorKey: GlobalKey<NavigatorState>(debugLabel: 'root'),
@@ -173,9 +175,45 @@ GoRouter createRouter({String initialLocation = '/splash'}) => GoRouter(
                   path: 'company-setup',
                   builder: (context, state) => const CompanyFormScreen(),
                 ),
+                GoRoute(
+                  path: 'products',
+                  builder: (context, state) => const ProductsScreen(),
+                  routes: [
+                    GoRoute(
+                      path: 'new',
+                      builder: (context, state) => const ProductFormScreen(),
+                    ),
+                    GoRoute(
+                      path: ':id/edit',
+                      builder: (context, state) {
+                        final idStr = state.pathParameters['id'];
+                        final id = int.tryParse(idStr ?? '');
+                        return ProductFormScreen(productId: id);
+                      },
+                    ),
+                  ],
+                ),
               ],
             ),
           ],
+        ),
+      ],
+    ),
+    GoRoute(
+      path: '/products',
+      builder: (context, state) => const ProductsScreen(),
+      routes: [
+        GoRoute(
+          path: 'new',
+          builder: (context, state) => const ProductFormScreen(),
+        ),
+        GoRoute(
+          path: ':id/edit',
+          builder: (context, state) {
+            final idStr = state.pathParameters['id'];
+            final id = int.tryParse(idStr ?? '');
+            return ProductFormScreen(productId: id);
+          },
         ),
       ],
     ),

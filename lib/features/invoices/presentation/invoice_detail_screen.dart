@@ -657,6 +657,191 @@ class InvoiceDetailScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 16),
+
+                      // Confidential Profit Analytics Card
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final profit = ref.watch(invoiceProfitProvider(invoice.id));
+                          if (profit == null) return const SizedBox.shrink();
+
+                          final hasCostOrFees = profit.totalCostMinor > 0 || profit.transactionFeesMinor > 0;
+                          final isProfitable = profit.netProfitMinor >= 0;
+
+                          return Card(
+                            elevation: 0,
+                            color: isProfitable
+                                ? Colors.green.shade50.withValues(alpha: 0.6)
+                                : Colors.red.shade50.withValues(alpha: 0.6),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: isProfitable ? Colors.green.shade200 : Colors.red.shade200,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.query_stats_rounded,
+                                            size: 20,
+                                            color: isProfitable ? Colors.green.shade800 : Colors.red.shade800,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            'تحليل الأرباح والتكاليف',
+                                            style: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.dark,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber.shade100,
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: Colors.amber.shade300),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.lock_outline, size: 12, color: Colors.amber.shade900),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'سري • لا يظهر بالـ PDF',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.amber.shade900,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'إجمالي المبيعات (الإيراد):',
+                                        style: TextStyle(fontSize: 13, color: AppColors.muted),
+                                      ),
+                                      Text(
+                                        formatMoney(profit.totalRevenueMinor, invoice.currency),
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Text(
+                                        'إجمالي تكلفة البنود:',
+                                        style: TextStyle(fontSize: 13, color: AppColors.muted),
+                                      ),
+                                      Text(
+                                        '- ${formatMoney(profit.totalCostMinor, invoice.currency)}',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: profit.totalCostMinor > 0 ? Colors.orange.shade800 : AppColors.muted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (profit.transactionFeesMinor > 0) ...[
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          'رسوم التحويل / البنك:',
+                                          style: TextStyle(fontSize: 13, color: AppColors.muted),
+                                        ),
+                                        Text(
+                                          '- ${formatMoney(profit.transactionFeesMinor, invoice.currency)}',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.red.shade700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                  const Divider(height: 18),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          const Text(
+                                            'صافي الربح الفعلي:',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.dark,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          if (profit.totalRevenueMinor > 0)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: isProfitable
+                                                    ? Colors.green.shade100
+                                                    : Colors.red.shade100,
+                                                borderRadius: BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                '${profit.profitMarginPercent.toStringAsFixed(1)}%',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: isProfitable
+                                                      ? Colors.green.shade900
+                                                      : Colors.red.shade900,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      Text(
+                                        '${isProfitable ? '+ ' : ''}${formatMoney(profit.netProfitMinor, invoice.currency)}',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: isProfitable ? Colors.green.shade800 : Colors.red.shade800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (!hasCostOrFees) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '💡 لم تحدد سعر تكلفة أو رسوم لهذه الفاتورة. يمكنك تعديل الفاتورة لتسجيل التكلفة والرسوم.',
+                                      style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade600),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                       const SizedBox(height: 20),
 
                       // Notes

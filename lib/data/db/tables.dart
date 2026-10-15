@@ -47,18 +47,34 @@ class Invoices extends Table {
   RealColumn get discountPercent => real().withDefault(const Constant(0.0))();
   IntColumn get taxMinor => integer().withDefault(const Constant(0))();
   RealColumn get taxPercent => real().withDefault(const Constant(0.0))();
+  IntColumn get transactionFeesMinor => integer().withDefault(const Constant(0))();
   TextColumn get notes => text().nullable()();
   IntColumn get subscriptionId =>
       integer().nullable().references(Subscriptions, #id)();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 
+/// دليل الأصناف والخدمات
+class Products extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
+  TextColumn get code => text().nullable()();
+  IntColumn get defaultPriceMinor => integer().withDefault(const Constant(0))();
+  IntColumn get defaultCostMinor => integer().withDefault(const Constant(0))();
+  TextColumn get description => text().nullable()();
+  TextColumn get currency => text().withDefault(const Constant('USD'))();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+}
+
 class InvoiceItems extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get invoiceId => integer().references(Invoices, #id)();
+  IntColumn get productId => integer().nullable().references(Products, #id)();
   TextColumn get description => text()();
   RealColumn get quantity => real().withDefault(const Constant(1))();
   IntColumn get unitPriceMinor => integer()();
+  IntColumn get costPriceMinor => integer().withDefault(const Constant(0))();
   IntColumn get lineTotalMinor => integer()();
 }
 

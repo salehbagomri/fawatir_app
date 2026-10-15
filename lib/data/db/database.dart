@@ -14,13 +14,14 @@ part 'database.g.dart';
   InvoiceItems,
   Payments,
   Subscriptions,
+  Products,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -32,6 +33,12 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(invoices, invoices.discountPercent);
             await m.addColumn(invoices, invoices.taxMinor);
             await m.addColumn(invoices, invoices.taxPercent);
+          }
+          if (from < 3) {
+            await m.createTable(products);
+            await m.addColumn(invoices, invoices.transactionFeesMinor);
+            await m.addColumn(invoiceItems, invoiceItems.costPriceMinor);
+            await m.addColumn(invoiceItems, invoiceItems.productId);
           }
         },
       );

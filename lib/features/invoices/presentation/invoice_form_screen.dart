@@ -12,11 +12,14 @@ import 'package:fawatir/features/clients/application/client_providers.dart';
 import 'package:fawatir/features/payments/application/payment_providers.dart';
 import 'package:fawatir/shared/widgets/app_snackbar.dart';
 import 'package:fawatir/shared/widgets/confirm_dialog.dart';
+import 'package:fawatir/features/products/application/product_providers.dart';
 
 class InvoiceItemRow {
   final descriptionController = TextEditingController();
   final qtyController = TextEditingController(text: '1');
   final priceController = TextEditingController();
+  final costController = TextEditingController();
+  int? productId;
 
   InvoiceItemRow();
 
@@ -24,6 +27,7 @@ class InvoiceItemRow {
     descriptionController.dispose();
     qtyController.dispose();
     priceController.dispose();
+    costController.dispose();
   }
 }
 
@@ -55,6 +59,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   final _discountController = TextEditingController();
   bool _isDiscountPercent = false;
   final _taxPercentController = TextEditingController();
+  final _feesController = TextEditingController();
 
   final List<InvoiceItemRow> _itemRows = [];
   bool _isSaving = false;
@@ -67,9 +72,11 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     if (_notesController.text.trim().isNotEmpty) return true;
     if (_discountController.text.trim().isNotEmpty) return true;
     if (_taxPercentController.text.trim().isNotEmpty) return true;
+    if (_feesController.text.trim().isNotEmpty) return true;
     for (final row in _itemRows) {
       if (row.descriptionController.text.trim().isNotEmpty) return true;
       if (row.priceController.text.trim().isNotEmpty) return true;
+      if (row.costController.text.trim().isNotEmpty) return true;
     }
     return false;
   }
@@ -79,6 +86,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     super.initState();
     _discountController.addListener(_onItemChanged);
     _taxPercentController.addListener(_onItemChanged);
+    _feesController.addListener(_onItemChanged);
     if (widget.invoiceId == null && widget.duplicateFromInvoiceId == null) {
       _addItemRow(); // Start with one item row by default for new invoices
     }
@@ -104,6 +112,12 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     }
     _fxRateController.text = invoice.fxRateToAccount.toString();
     _notesController.text = invoice.notes ?? '';
+
+    if (invoice.transactionFeesMinor > 0) {
+      _feesController.text = (invoice.transactionFeesMinor / 100.0).toStringAsFixed(2);
+    } else {
+      _feesController.text = '';
+    }
 
     if (invoice.discountPercent > 0) {
       _isDiscountPercent = true;
@@ -132,8 +146,13 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         row.descriptionController.text = item.description;
         row.qtyController.text = item.quantity.toString();
         row.priceController.text = (item.unitPriceMinor / 100.0).toStringAsFixed(2);
+        if (item.costPriceMinor > 0) {
+          row.costController.text = (item.costPriceMinor / 100.0).toStringAsFixed(2);
+        }
+        row.productId = item.productId;
         row.qtyController.addListener(_onItemChanged);
         row.priceController.addListener(_onItemChanged);
+        row.costController.addListener(_onItemChanged);
         _itemRows.add(row);
       }
     } else {
@@ -147,8 +166,10 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
   void dispose() {
     _discountController.removeListener(_onItemChanged);
     _taxPercentController.removeListener(_onItemChanged);
+    _feesController.removeListener(_onItemChanged);
     _discountController.dispose();
     _taxPercentController.dispose();
+    _feesController.dispose();
     for (final row in _itemRows) {
       row.dispose();
     }
@@ -161,6 +182,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
     final row = InvoiceItemRow();
     row.qtyController.addListener(_onItemChanged);
     row.priceController.addListener(_onItemChanged);
+    row.costController.addListener(_onItemChanged);
     setState(() {
       _itemRows.add(row);
     });
@@ -171,6 +193,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
       final row = _itemRows.removeAt(index);
       row.qtyController.removeListener(_onItemChanged);
       row.priceController.removeListener(_onItemChanged);
+      row.costController.removeListener(_onItemChanged);
       row.dispose();
       _onItemChanged();
     }
@@ -178,6 +201,49 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
 
   void _onItemChanged() {
     setState(() {}); // Recalculate totals
+  }
+
+  void _pickProductForItem(InvoiceItemRow row) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ProductPickerModal(
+        currency: _invoiceCurrency,
+        onSelected: (product) {
+          setState(() {
+            row.descriptionController.text = product.name;
+            row.priceController.text = (product.defaultPriceMinor / 100.0).toStringAsFixed(2);
+            if (product.defaultCostMinor > 0) {
+              row.costController.text = (product.defaultCostMinor / 100.0).toStringAsFixed(2);
+            }
+            row.productId = product.id;
+          });
+          _onItemChanged();
+        },
+      ),
+    );
+  }
+
+  int get _totalCostMinor {
+    int total = 0;
+    for (final row in _itemRows) {
+      final qty = double.tryParse(row.qtyController.text.trim()) ?? 0.0;
+      final costStr = row.costController.text.trim();
+      final costMinor = parseToMinor(costStr);
+      total += (qty * costMinor).round();
+    }
+    return total;
+  }
+
+  int get _transactionFeesMinor {
+    final text = _feesController.text.trim();
+    if (text.isEmpty) return 0;
+    return parseToMinor(text);
+  }
+
+  int get _estimatedProfitMinor {
+    return _totalMinor - _totalCostMinor - _transactionFeesMinor;
   }
 
   int get _subtotalMinor {
@@ -337,12 +403,15 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         final desc = row.descriptionController.text.trim();
         final qty = double.tryParse(row.qtyController.text.trim()) ?? 1.0;
         final price = parseToMinor(row.priceController.text.trim());
+        final cost = parseToMinor(row.costController.text.trim());
 
         return InvoiceItemsCompanion(
           invoiceId: isEditing ? Value(widget.invoiceId!) : const Value.absent(),
+          productId: Value(row.productId),
           description: Value(desc),
           quantity: Value(qty),
           unitPriceMinor: Value(price),
+          costPriceMinor: Value(cost),
           lineTotalMinor: const Value(0),
         );
       }).toList();
@@ -367,6 +436,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
           discountPercent: Value(_isDiscountPercent ? discountVal : 0.0),
           taxMinor: Value(_taxMinor),
           taxPercent: Value(taxVal),
+          transactionFeesMinor: Value(_transactionFeesMinor),
           notes: Value(_notesController.text.trim().isEmpty ? null : _notesController.text.trim()),
         );
 
@@ -375,6 +445,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         ref.invalidate(invoiceByIdProvider(widget.invoiceId!));
         ref.invalidate(invoiceItemsProvider(widget.invoiceId!));
         ref.invalidate(invoiceRemainingProvider(widget.invoiceId!));
+        ref.invalidate(invoiceProfitProvider(widget.invoiceId!));
         ref.invalidate(invoicesListProvider);
         if (_selectedClient != null) {
           ref.invalidate(clientInvoicesProvider(_selectedClient!.id));
@@ -406,6 +477,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
           discountPercent: Value(_isDiscountPercent ? discountVal : 0.0),
           taxMinor: Value(_taxMinor),
           taxPercent: Value(taxVal),
+          transactionFeesMinor: Value(_transactionFeesMinor),
           notes: Value(_notesController.text.trim().isEmpty ? null : _notesController.text.trim()),
         );
 
@@ -893,9 +965,15 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                               Expanded(
                                 child: TextFormField(
                                   controller: row.descriptionController,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     labelText: 'وصف البند *',
-                                    border: UnderlineInputBorder(),
+                                    hintText: 'أو اختر من دليل الأصناف...',
+                                    border: const UnderlineInputBorder(),
+                                    suffixIcon: IconButton(
+                                      icon: const Icon(Icons.playlist_add_rounded, color: AppColors.accent),
+                                      tooltip: 'اختيار من دليل الأصناف',
+                                      onPressed: () => _pickProductForItem(row),
+                                    ),
                                   ),
                                   validator: (val) =>
                                       val == null || val.trim().isEmpty ? 'يرجى إدخال الوصف' : null,
@@ -937,7 +1015,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                                   },
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
 
                               // Price
                               Expanded(
@@ -962,7 +1040,7 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                                   },
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
 
                               // Line Total Display
                               Expanded(
@@ -980,6 +1058,27 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                                     ),
                                   ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  controller: row.costController,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: InputDecoration(
+                                    labelText: 'سعر التكلفة للوحدة (خاص بالأرباح - اختياري)',
+                                    hintText: '0.00',
+                                    helperText: 'سري لحساب أرباحك، لا يظهر للعميل في الفاتورة والـ PDF',
+                                    helperStyle: TextStyle(fontSize: 10, color: Colors.blueGrey.shade700),
+                                    prefixIcon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
+                                    suffixText: _invoiceCurrency,
+                                    border: const OutlineInputBorder(),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  ),
                                 ),
                               ),
                             ],
@@ -1068,6 +1167,19 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                           hintText: 'مثال: 15 (0 تعني بدون ضريبة)',
                         ),
                       ),
+                      const Divider(height: 24),
+                      TextFormField(
+                        controller: _feesController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: InputDecoration(
+                          labelText: 'رسوم/عمولة العملية عليك (البنك أو التحويل)',
+                          hintText: 'مثال: 1.50',
+                          helperText: 'تُخصم من صافي أرباحك الشخصية ولا تُضاف على الفاتورة',
+                          prefixIcon: const Icon(Icons.credit_card_outlined),
+                          suffixText: _invoiceCurrency,
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1151,6 +1263,78 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+
+              // Live Profit Preview Card
+              if (_totalCostMinor > 0 || _transactionFeesMinor > 0) ...[
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: _estimatedProfitMinor >= 0 ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _estimatedProfitMinor >= 0 ? Colors.green.shade200 : Colors.red.shade200,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            _estimatedProfitMinor >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                            color: _estimatedProfitMinor >= 0 ? Colors.green.shade800 : Colors.red.shade800,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'تحليل الأرباح التقديرية (سري خاص بك):',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: _estimatedProfitMinor >= 0 ? Colors.green.shade900 : Colors.red.shade900,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade100,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'سري • لن يظهر بالـ PDF',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.green.shade900),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _transactionFeesMinor > 0
+                                ? 'التكلفة: ${formatMoney(_totalCostMinor, _invoiceCurrency)} + رسوم: ${formatMoney(_transactionFeesMinor, _invoiceCurrency)}'
+                                : 'التكلفة: ${formatMoney(_totalCostMinor, _invoiceCurrency)}',
+                            style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                          ),
+                          Text(
+                            _totalMinor > 0
+                                ? 'صافي الربح: ${formatMoney(_estimatedProfitMinor, _invoiceCurrency)} (${((_estimatedProfitMinor / _totalMinor) * 100).toStringAsFixed(1)}%)'
+                                : 'صافي الربح: ${formatMoney(_estimatedProfitMinor, _invoiceCurrency)}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: _estimatedProfitMinor >= 0 ? Colors.green.shade800 : Colors.red.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // Notes
               TextFormField(
@@ -1238,6 +1422,173 @@ class _InvoiceFormScreenState extends ConsumerState<InvoiceFormScreen> {
         ),
       ),
     ),
+    );
+  }
+}
+
+class _ProductPickerModal extends ConsumerStatefulWidget {
+  final String currency;
+  final ValueChanged<Product> onSelected;
+
+  const _ProductPickerModal({
+    required this.currency,
+    required this.onSelected,
+  });
+
+  @override
+  ConsumerState<_ProductPickerModal> createState() => _ProductPickerModalState();
+}
+
+class _ProductPickerModalState extends ConsumerState<_ProductPickerModal> {
+  String _search = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final productsAsync = ref.watch(productsListProvider);
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.75,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.inventory_2_outlined, color: AppColors.accent),
+                    SizedBox(width: 8),
+                    Text(
+                      'اختر صنفاً من الدليل',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.accent),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'ابحث بالاسم أو الكود...',
+                prefixIcon: const Icon(Icons.search, color: AppColors.muted),
+                filled: true,
+                fillColor: const Color(0xFFF1F5F9),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+              ),
+              onChanged: (val) => setState(() => _search = val.trim().toLowerCase()),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: productsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (err, stack) => Center(child: Text('خطأ: $err')),
+                data: (products) {
+                  final filtered = _search.isEmpty
+                      ? products
+                      : products.where((p) {
+                          final nameMatches = p.name.toLowerCase().contains(_search);
+                          final codeMatches = p.code?.toLowerCase().contains(_search) ?? false;
+                          return nameMatches || codeMatches;
+                        }).toList();
+
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.inventory_2_outlined, size: 54, color: AppColors.muted.withValues(alpha: 0.4)),
+                          const SizedBox(height: 12),
+                          Text(
+                            _search.isEmpty ? 'لا توجد أصناف في الدليل حالياً' : 'لا توجد أصناف مطابقة للبحث',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.dark),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'يمكنك إضافة أصنافك إلى الدليل لتسهيل اختيارها لاحقاً.',
+                            style: TextStyle(color: AppColors.muted, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, index) => const Divider(height: 1),
+                    itemBuilder: (context, i) {
+                      final p = filtered[i];
+                      final profitMinor = p.defaultPriceMinor - p.defaultCostMinor;
+
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        leading: CircleAvatar(
+                          backgroundColor: AppColors.accent.withValues(alpha: 0.1),
+                          child: const Icon(Icons.inventory_2_rounded, color: AppColors.accent, size: 18),
+                        ),
+                        title: Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                p.name,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
+                            ),
+                            if (p.code != null && p.code!.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.blueGrey.shade50,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(p.code!, style: TextStyle(fontSize: 11, color: Colors.blueGrey.shade800)),
+                              ),
+                            ],
+                          ],
+                        ),
+                        subtitle: Text(
+                          p.defaultCostMinor > 0
+                              ? 'سعر البيع: ${formatMoney(p.defaultPriceMinor, widget.currency)} • التكلفة: ${formatMoney(p.defaultCostMinor, widget.currency)}'
+                              : 'سعر البيع: ${formatMoney(p.defaultPriceMinor, widget.currency)}',
+                          style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                        ),
+                        trailing: profitMinor > 0
+                            ? Text(
+                                '+ ${formatMoney(profitMinor, widget.currency)}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green.shade700,
+                                ),
+                              )
+                            : null,
+                        onTap: () {
+                          widget.onSelected(p);
+                          Navigator.of(context).pop();
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

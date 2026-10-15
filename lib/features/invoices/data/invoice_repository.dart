@@ -255,3 +255,38 @@ class InvoiceRepository {
 final invoiceRepositoryProvider = Provider<InvoiceRepository>(
   (ref) => InvoiceRepository(ref.watch(databaseProvider)),
 );
+
+class InvoiceProfit {
+  final int totalRevenueMinor;
+  final int totalCostMinor;
+  final int transactionFeesMinor;
+  final int netProfitMinor;
+  final double profitMarginPercent;
+
+  const InvoiceProfit({
+    required this.totalRevenueMinor,
+    required this.totalCostMinor,
+    required this.transactionFeesMinor,
+    required this.netProfitMinor,
+    required this.profitMarginPercent,
+  });
+}
+
+InvoiceProfit calculateInvoiceProfit(Invoice invoice, List<InvoiceItem> items) {
+  int totalCost = 0;
+  for (final item in items) {
+    totalCost += (item.quantity * item.costPriceMinor).round();
+  }
+  final fees = invoice.transactionFeesMinor;
+  final revenue = invoice.totalMinor;
+  final netProfit = revenue - totalCost - fees;
+  final margin = revenue > 0 ? (netProfit / revenue) * 100 : 0.0;
+
+  return InvoiceProfit(
+    totalRevenueMinor: revenue,
+    totalCostMinor: totalCost,
+    transactionFeesMinor: fees,
+    netProfitMinor: netProfit,
+    profitMarginPercent: margin,
+  );
+}

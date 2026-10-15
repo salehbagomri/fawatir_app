@@ -287,3 +287,14 @@ final filteredInvoicesProvider = Provider.autoDispose<AsyncValue<List<Invoice>>>
     return result;
   });
 });
+
+final invoiceProfitProvider = Provider.autoDispose.family<InvoiceProfit?, int>((ref, invoiceId) {
+  final invoiceAsync = ref.watch(invoiceByIdProvider(invoiceId));
+  final itemsAsync = ref.watch(invoiceItemsProvider(invoiceId));
+
+  final invoice = invoiceAsync.value;
+  final items = itemsAsync.value;
+
+  if (invoice == null || items == null) return null;
+  return calculateInvoiceProfit(invoice, items);
+});
